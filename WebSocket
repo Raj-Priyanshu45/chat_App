@@ -1,0 +1,150 @@
+Http
+In http client request server everytime and
+client hit server with an request and server process and replies
+after that connection is closed
+
+
+TCP (protocol)
+->
+TCP (Transmission Control Protocol) is a transport-layer protocol that provides a reliable, ordered, error-checked stream of bytes between two devices over a network.
+
+If HTTP is the language you speak and WebSocket is the conversation style, then TCP is the telephone line carrying everything.
+
+Simple analogy
+
+Imagine sending a 100-page document to a friend.
+
+Without TCP:
+
+Pages might arrive out of order.
+Some pages might never arrive.
+Some pages might arrive twice.
+You wouldn't know.
+
+With TCP:
+
+Every page is numbered.
+The receiver confirms what was received.
+Missing pages are resent.
+Pages are put back in the correct order.
+
+So the receiver gets the exact same 100-page document.
+
+
+
+where does TCP and other layers lies :
+    Application Layer
+    -----------------
+    HTTP
+    WebSocket
+    SMTP
+    FTP
+
+    Transport Layer
+    ---------------
+    TCP
+
+    Internet Layer
+    --------------
+    IP
+
+    Physical Layer
+    --------------
+    Wi-Fi / Ethernet / Fiber
+
+
+
+Before sending data TCP establish a 3 way handshake:
+
+    Step-1:
+        Syn (synchronize)
+            In this user sends a request to server that i want to establish TCP connection
+
+    Step-2:
+        Ack-Syn(Acknowledgments-synchronize)
+            In this server says "I received your request and i am ready"
+            and expects or wait for data from client
+
+    Step-3:
+        Ack
+            In this client confirm the connection and sends data
+
+
+if client wants more info then it is not possible as connection is closed
+
+eg : if someone searches about stock market then server collects all the present info process and send
+        but at that time only the stock market keeps on updating and the connection is also closed
+
+        so the issue arrises with this
+        in real time applications
+
+so
+1st option is
+Polling ->
+        In this when one request is done then another request is made to server keeping this process
+        till we need
+        In this we have to make the connection open again and again we have to do TCP handshake
+        SO it is not an efficient way
+
+        contains overhead:
+
+        connection open
+            |
+        request request
+            |
+        connection close
+            |
+        connection open
+             |
+        request request
+             |
+        connection close
+             |
+        keeps on going
+
+
+        not really real time polling has intervals
+
+        many resource waste
+
+
+Solution is WebSocket(Connection protocol) :
+
+In this we open one connection and does not close it
+by the help of this server can send response anytime and client can also share anytime
+in the same connection
+Server and client reuses the same connection
+-> real time
+
+A WebSocket API makes it possible to make/create a two way interactive connection session between user and server
+In this way we does not have to poll the server for request
+
+A Websocket request is a normal http request only with
+specialized headers ->
+The important headers are:
+
+Upgrade: websocket → "I want to switch from HTTP to WebSocket."
+Connection: Upgrade → "Upgrade this connection."
+Sec-WebSocket-Key → Random key used during the handshake.
+Sec-WebSocket-Version → WebSocket protocol version.
+
+its status code is 101
+
+
+WebSocket is implemented on both frontend  and backend side
+A WebSocket has two endpoints
+1.frontend -> which is responsible for opening websocket connection and send and receive messages
+2.backend -> it is responsible for accepting the connection , processes messages and send response
+
+
+
+STOMP (Simple text oriented messaging protocol)
+works on the top of web socket and
+communication is performed via this only
+provides a abstraction for websocket
+
+
+SOCKJs
+library provided by Js
+provide fallback mechanism for websocket
+eg if websocket is not working polling might be used

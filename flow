@@ -1,0 +1,121 @@
+User types
+
+Hello
+
+        |
+        |
+        v
+
+/app/sendMessages/room123
+
+        |
+        |
+        v
+
+@MessageMapping("/sendMessages/{roomId}")
+
+        |
+        |
+        v
+
+chatService.sendMessage()
+
+        |
+        |
+        +------> Save in MongoDB
+
+        |
+        |
+        v
+
+return message
+
+        |
+        |
+        v
+
+@SendTo("/topic/room/{roomId}")
+
+        |
+        |
+        v
+
+/topic/room/room123
+
+        |
+    --------------------
+    |        |         |
+    v        v         v
+
+ User A   User B    User C
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ User opens app
+
+         |
+
+ Connect WebSocket
+
+         |
+
+ Subscribe /topic/room/1
+
+         |
+
+ GET /messages
+
+         |
+
+ Old messages loaded
+
+         |
+
+ Receive live messages
+
+         |
+
+ Internet lost
+
+         |
+
+ WebSocket closed
+
+         |
+
+ Internet back
+
+         |
+
+ Reconnect WebSocket
+
+         |
+
+ Subscribe again
+
+         |
+
+ GET missed messages
+
+         |
+
+ Continue receiving live messages

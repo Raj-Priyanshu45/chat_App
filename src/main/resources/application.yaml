@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: chat_app
+
+  mongodb:
+    uri: mongodb://root:root@localhost:27017/chatAppDB?authSource=admin
+

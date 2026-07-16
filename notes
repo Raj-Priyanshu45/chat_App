@@ -1,0 +1,15 @@
+
+Converting list to page
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+
+List<User> users = userService.getUsers();
+
+Page<User> page = new PageImpl<>(users);
+
+
+
+DestinationVariable
+MessageMapping
+SendTo
