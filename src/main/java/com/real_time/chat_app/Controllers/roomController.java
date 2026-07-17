@@ -29,7 +29,7 @@ public class roomController {
             return ResponseEntity.status(409).body("Room is already there");
         }
 
-        URI loc = URI.create("api/v1/rooms"+room.getId());
+        URI loc = URI.create("/api/v1/rooms"+room.getId());
 
         return ResponseEntity.created(loc).body(room);
     }
@@ -46,7 +46,7 @@ public class roomController {
         return ResponseEntity.ok(room);
     }
 
-    @PostMapping("/{roomId}/messages")
+    @GetMapping("/{roomId}/messages")
     public ResponseEntity<?> getAllMessages(
             @PathVariable String roomId ,
             @RequestParam(value = "page" , defaultValue = "0" , required = false) int page,

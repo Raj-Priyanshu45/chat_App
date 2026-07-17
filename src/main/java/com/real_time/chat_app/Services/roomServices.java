@@ -3,6 +3,9 @@ package com.real_time.chat_app.Services;
 import com.real_time.chat_app.DTOs.roomId;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.Rooms;
+import com.real_time.chat_app.Models.Users;
+import com.real_time.chat_app.Repo.MessRepo;
+import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.roomRepo;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -17,8 +21,10 @@ import java.util.List;
 public class roomServices {
 
     private final roomRepo repo;
+    private final MessRepo messRepo;
+    private final UserRepo userRepo;
 
-    public Rooms createRoom(@Valid roomId roomId) {
+    public Rooms createRoom(@Valid roomId roomId ) {
 
         Rooms room = repo.findByRoomId(roomId.roomId()).orElse(null);
 
@@ -41,7 +47,7 @@ public class roomServices {
 
         if(room == null) return null;
 
-        List<Message> messages = room.getMess();
+        List<Message> messages = messRepo.findByRoomId(roomId);
 
         int start = Math.max(0 , messages.size() - (page + 1) * size);
 

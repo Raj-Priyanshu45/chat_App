@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface roomRepo extends MongoRepository<Rooms, String> {
     Optional<Rooms> findByRoomId(String roomId);
+    Boolean existsByRoomId(String roomId);
 }

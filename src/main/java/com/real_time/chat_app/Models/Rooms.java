@@ -20,6 +20,8 @@ public class Rooms {
 
     private String roomId;
 
+//    private List<Message> mess = new ArrayList<>();
+
     @Builder.Default
-    private List<Message> mess = new ArrayList<>();
+    private List<String> users = new ArrayList<>();
 }

@@ -1,0 +1,82 @@
+
+Public Domain
+
+A public domain is a domain name that is accessible over the internet by anyone.
+
+Examples:
+
+google.com
+github.com
+yourapp.com
+Internet
+   |
+   +--> google.com
+   +--> github.com
+   +--> yourapp.com
+
+Characteristics:
+
+Reachable from anywhere on the internet.
+Has a public DNS record.
+Uses a public IP address.
+Typically secured with HTTPS.
+
+Example:
+
+https://chat.example.com
+
+Anyone can open it in their browser.
+
+
+
+Private Domain
+
+A private domain is only accessible within a private network (office, company, home lab, Kubernetes cluster, etc.).
+
+Examples:
+
+keycloak.local
+company.internal
+chat-service.local
+
+or
+
+http://192.168.1.10
+http://10.0.0.5
+
+These are not accessible from the public internet.
+
+Example network:
+
+Office Network
+
+Laptop
+   |
+Router
+   |
+-------------------------
+|                       |
+keycloak.internal   db.internal
+
+Someone outside the office cannot access these addresses.
+
+
+
+| Feature                  | Public Domain  | Private Domain                                    |
+| ------------------------ | -------------- | ------------------------------------------------- |
+| Accessible from internet | ✅ Yes          | ❌ No                                              |
+| DNS                      | Public DNS     | Internal DNS or hosts file                        |
+| IP Address               | Public IP      | Private IP (192.168.x.x, 10.x.x.x, 172.16–31.x.x) |
+| Used for                 | Websites, APIs | Internal services                                 |
+| Example                  | `example.com`  | `keycloak.internal`                               |
+
+
+
+
+
+| Feature                   | Localhost   | Private Network                                |
+| ------------------------- | ----------- | ---------------------------------------------- |
+| Visible to same machine   | ✅ Yes       | ✅ Yes                                          |
+| Visible to other machines | ❌ No        | ✅ Yes (if they're in the same private network) |
+| Internet can access       | ❌ No        | ❌ No                                           |
+| Example                   | `127.0.0.1` | `10.0.0.5`, `192.168.1.20`, Docker network     |
