@@ -24,11 +24,11 @@ public class chatService {
 
     private final MessRepo messRepo;
 
-    public Message sendMessage(MessageRequest request , String roomId){
+    public Message sendMessage(MessageRequest request , String roomId , String username){
 
         Boolean roomFlag = roomRepo.existsByRoomId(roomId);
 
-        boolean userFlag = userRepo.existsByUsername(request.userName());
+        boolean userFlag = userRepo.existsByUsername(username);
 
         if(!roomFlag){
             log.debug("Unknown Room");
@@ -43,7 +43,7 @@ public class chatService {
         Message mess = Message.builder()
                 .roomId(roomId)
                 .content(request.message())
-                .sender(request.userName())
+                .sender(username)
                 .timeStamp(LocalDateTime.now())
                 .build();
 

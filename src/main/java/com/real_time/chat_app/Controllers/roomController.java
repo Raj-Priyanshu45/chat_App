@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -20,6 +21,7 @@ public class roomController {
     private final roomServices roomServices;
 
     //create rooms
+    @PreAuthorize("hasRole('USER')")
     @PostMapping("/create")
     public ResponseEntity<?> createRooms(@RequestBody @Valid roomId roomId){
 
@@ -35,6 +37,7 @@ public class roomController {
     }
 
 
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/{roomId}")
     public ResponseEntity<?> getRoom(@PathVariable String roomId){
 
@@ -46,6 +49,7 @@ public class roomController {
         return ResponseEntity.ok(room);
     }
 
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/{roomId}/messages")
     public ResponseEntity<?> getAllMessages(
             @PathVariable String roomId ,

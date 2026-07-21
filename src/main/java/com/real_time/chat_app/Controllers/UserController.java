@@ -6,6 +6,7 @@ import com.real_time.chat_app.Services.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -16,6 +17,7 @@ public class UserController {
 
     private final UserService userService;
 
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/")
     public ResponseEntity<?> retAllUsers(
             @RequestParam(value = "page" , defaultValue = "0" , required = false) int pageNumber ,
@@ -24,6 +26,7 @@ public class UserController {
         return ResponseEntity.ok(userService.retAllUsers(pageNumber , size));
     }
 
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/me")
     public ResponseEntity<?> saveOrShowUser(){
 

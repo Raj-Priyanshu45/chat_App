@@ -1,0 +1,236 @@
+The Simple Broker is Spring's built-in in-memory message broker.
+
+The easiest way to think about it is:
+
+It is a small post office inside your Spring Boot application.
+
+Its job is simple:
+
+Remember who subscribed to which destination.
+Deliver messages to those subscribers.
+
+It does not store messages permanently, does not scale across multiple servers, and does not support advanced messaging features.
+
+Without a broker
+
+Suppose you have three users.
+
+Alice
+Bob
+Charlie
+
+Alice sends
+
+Hello
+
+Now your controller would have to know
+
+Who is online?
+Who joined Room 1?
+Send to Bob.
+Send to Charlie.
+
+You'd have to write all that yourself.
+
+With a Simple Broker
+
+The broker maintains a table like this:
+
+Destination              Subscribers
+--------------------------------------------
+/topic/room/1           Alice, Bob, Charlie
+/topic/room/2           David, John
+/topic/news             Alice, John
+
+When a message arrives
+
+Destination:
+/topic/room/1
+
+Body:
+Hello
+
+The broker automatically delivers it to
+
+Alice
+
+Bob
+
+Charlie
+Where do you configure it?
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig
+        implements WebSocketMessageBrokerConfigurer {
+
+    @Override
+    public void configureMessageBroker(
+            MessageBrokerRegistry registry) {
+
+        registry.enableSimpleBroker("/topic");
+
+        registry.setApplicationDestinationPrefixes("/app");
+    }
+}
+
+This line
+
+registry.enableSimpleBroker("/topic");
+
+starts Spring's in-memory broker.
+
+What does /topic mean?
+
+Suppose the server sends
+
+messagingTemplate.convertAndSend(
+        "/topic/room/1",
+        message
+);
+
+Because
+
+enableSimpleBroker("/topic")
+
+exists,
+
+Spring says
+
+"This destination belongs to the broker."
+
+The broker then forwards it to all subscribers.
+
+What is /app?
+
+This is not handled by the broker.
+
+Suppose client sends
+
+SEND
+
+destination:
+/app/chat
+
+Spring routes it to
+
+@MessageMapping("/chat")
+
+So the flow becomes
+
+Client
+
+↓
+
+SEND /app/chat
+
+↓
+
+Controller
+
+↓
+
+convertAndSend("/topic/room/1")
+
+↓
+
+Simple Broker
+
+↓
+
+Subscribers
+
+Notice the difference.
+
+/app
+
+means
+
+"Go to my controller."
+
+/topic
+
+means
+
+"Go to the broker."
+
+Complete example
+Client sends
+SEND
+destination:/app/chat
+
+Hello
+
+Spring calls
+
+@MessageMapping("/chat")
+public void send(ChatMessage msg){
+
+    messagingTemplate.convertAndSend(
+            "/topic/room/1",
+            msg
+    );
+
+}
+
+Now broker receives
+
+Destination:
+/topic/room/1
+
+Body:
+Hello
+
+Broker checks
+
+Who subscribed?
+
+Alice
+
+Bob
+
+Charlie
+
+Broker sends
+
+Hello
+
+↓
+
+Alice
+
+↓
+
+Bob
+
+↓
+
+Charlie
+Is it like RabbitMQ?
+
+Very similar in purpose, but much simpler.
+
+RabbitMQ
+
+Separate server
+Persistent queues
+Durable messages
+Acknowledgements
+Routing exchanges
+Cluster support
+
+Simple Broker
+
+Runs inside Spring Boot
+Memory only
+No persistence
+No clustering
+Very fast to start
+When should you use Simple Broker?
+
+Good for
+
+Chat applications
+Notifications
+Learning
+College projects
+Small to medium applications

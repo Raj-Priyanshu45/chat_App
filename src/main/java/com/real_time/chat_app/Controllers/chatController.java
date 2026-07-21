@@ -7,8 +7,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.security.Principal;
 
 @Controller
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ public class chatController {
                 //sending message
 
 
+    @PreAuthorize("hasRole('USER')")
     @MessageMapping("/sendMessages/{roomId}")
     //for sending and receiving message
     @SendTo("/topic/room/{roomId}")
@@ -31,8 +35,10 @@ public class chatController {
     //used to publish message to all the topic or groups
     public Message sendMessage(
             @DestinationVariable String roomId ,
-            @RequestBody MessageRequest request
+            @RequestBody MessageRequest request ,
+            Principal principal
     ){
-        return chatService.sendMessage(request , roomId);
+
+        return chatService.sendMessage(request , roomId , principal.getName());
     }
 }
