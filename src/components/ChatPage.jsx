@@ -28,6 +28,7 @@ const ChatPage = () => {
       try {
         const loadedMessages = await getMessages(roomId);
         setMessages(loadedMessages);
+        scrollToBottom();
       } catch {
         toast.error('Unable to load older messages.');
       }
@@ -56,6 +57,7 @@ const ChatPage = () => {
         client.subscribe(`/topic/room/${roomId}`, (message) => {
           const payload = JSON.parse(message.body);
           setMessages((prev) => [...prev, payload]);
+          scrollToBottom();
         });
       },
       onStompError: (frame) => {
@@ -79,9 +81,21 @@ const ChatPage = () => {
 
   useEffect(() => {
     if (chatBoxRef.current) {
-      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+      chatBoxRef.current.scrollTo({
+        top: chatBoxRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   }, [messages]);
+
+  const scrollToBottom = () => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTo({
+        top: chatBoxRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  };
 
   const sendMessage = () => {
     if (!stompClient || !connected || !input.trim()) return;
@@ -153,14 +167,23 @@ const ChatPage = () => {
               className={`mb-4 flex ${message.sender === currentUserId || message.sender === user?.subject ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-[20px] px-4 py-3 shadow-sm ${message.sender === currentUserId || message.sender === user?.subject ? 'bg-cyan-600 text-white' : 'bg-slate-800/90 text-slate-100'}`}
+                className="flex items-center gap-2"
               >
-                <div className="mb-1 text-sm font-semibold">
-                  {message.sender === currentUserId || message.sender === user?.subject ? currentUserId || message.sender : message.sender}
+                <div
+                  className="h-8 w-8 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-semibold"
+                >
+                  {message.sender[0].toUpperCase()}
                 </div>
-                <div className="break-words text-sm">{message.content || message.message}</div>
-                <div className={`mt-2 text-[11px] ${message.sender === currentUserId || message.sender === user?.subject ? 'text-cyan-100' : 'text-slate-400'}`}>
-                  {formatTime(message.timeStamp)}
+                <div
+                  className={`max-w-[80%] rounded-[20px] px-4 py-3 shadow-sm ${message.sender === currentUserId || message.sender === user?.subject ? 'bg-cyan-600 text-white' : 'bg-slate-800/90 text-slate-100 hover:bg-slate-700/50'}`}
+                >
+                  <div className="mb-1 text-sm font-semibold">
+                    {message.sender === currentUserId || message.sender === user?.subject ? currentUserId || message.sender : message.sender}
+                  </div>
+                  <div className="break-words text-sm">{message.content || message.message}</div>
+                  <div className={`mt-2 text-[11px] ${message.sender === currentUserId || message.sender === user?.subject ? 'text-cyan-100' : 'text-slate-400'}`}>
+                    {formatTime(message.timeStamp)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -169,7 +192,7 @@ const ChatPage = () => {
       </main>
 
       <footer className="border-t border-slate-800/70 bg-slate-900/80 px-4 py-4 shadow-inner backdrop-blur sm:px-6">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 rounded-full border border-slate-700 bg-slate-800/90 px-3 py-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 rounded-full border border-slate-700 bg-slate-800/90 px-3 py-3 focus-within:border-cyan-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-cyan-600">
           <input
             value={input}
             onChange={(event) => setInput(event.target.value)}
