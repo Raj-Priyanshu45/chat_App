@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
-import { createRoomApi, joinChatApi, getMyInfo } from '../services/RoomService';
+import { createRoomApi, joinChatApi } from '../services/RoomService';
+import { getMyInfo } from '../services/UserService';
 
 const JoinCreateChat = () => {
   const [detail, setDetail] = useState({ roomId: '' });
