@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const kc = new Keycloak(keycloakConfig);
 
-    kc.init({ onLoad: 'check-sso', pkceMethod: 'S256' })
+    kc.init({ onLoad: 'login-required', pkceMethod: 'S256' })
       .then((isAuthenticated) => {
         setKeycloak(kc);
         setAuthenticated(isAuthenticated);
