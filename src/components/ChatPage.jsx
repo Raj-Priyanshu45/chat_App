@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
 import toast from 'react-hot-toast';
 import { MdSend } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
-import { baseURL } from '../config/AxiosHelper';
+import useAuth from '../context/AuthContext';
+import { getWebSocketUrl } from '../config/AxiosHelper';
 import { getMessages } from '../services/RoomService';
 import { formatTime } from '../config/helper';
 
 const ChatPage = () => {
   const { roomId, currentUser, connected, setConnected, setRoomId, setCurrentUser } = useChatContext();
+  const { authenticated, token, user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [stompClient, setStompClient] = useState(null);
@@ -27,7 +28,7 @@ const ChatPage = () => {
       try {
         const loadedMessages = await getMessages(roomId);
         setMessages(loadedMessages);
-      } catch (error) {
+      } catch {
         toast.error('Unable to load older messages.');
       }
     };
@@ -36,11 +37,18 @@ const ChatPage = () => {
   }, [connected, navigate, roomId]);
 
   useEffect(() => {
-    if (!connected || !roomId) return undefined;
+    if (!authenticated || !connected || !roomId || !token) {
+      if (!authenticated) {
+        navigate('/');
+      }
+      return undefined;
+    }
 
-    const socket = new SockJS(`${baseURL}/chat`);
     const client = new Client({
-      webSocketFactory: () => socket,
+      brokerURL: getWebSocketUrl(),
+      connectHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
       reconnectDelay: 5000,
       onConnect: () => {
         setStompClient(client);
@@ -49,6 +57,12 @@ const ChatPage = () => {
           const payload = JSON.parse(message.body);
           setMessages((prev) => [...prev, payload]);
         });
+      },
+      onStompError: (frame) => {
+        toast.error(frame.body || 'WebSocket error.');
+      },
+      onWebSocketError: () => {
+        toast.error('Unable to connect to chat server.');
       },
       onDisconnect: () => {
         setStompClient(null);
@@ -61,7 +75,7 @@ const ChatPage = () => {
       client.deactivate();
       setStompClient(null);
     };
-  }, [connected, roomId]);
+  }, [authenticated, connected, roomId, token, navigate]);
 
   useEffect(() => {
     if (chatBoxRef.current) {
@@ -74,8 +88,6 @@ const ChatPage = () => {
 
     const payload = {
       message: input.trim(),
-      sender: currentUser,
-      roomId,
     };
 
     stompClient.publish({
@@ -93,8 +105,11 @@ const ChatPage = () => {
     setConnected(false);
     setRoomId('');
     setCurrentUser('');
+    logout();
     navigate('/');
   };
+
+  const currentUserId = currentUser || user?.username || user?.name || user?.subject || '';
 
   const groupedMessages = useMemo(() => {
     return messages.map((message, index) => ({
@@ -113,7 +128,7 @@ const ChatPage = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-sm text-emerald-300">
-              {currentUser}
+              {currentUser || user?.name || user?.username || user?.subject || 'Unknown user'}
             </div>
             <button
               type="button"
@@ -135,14 +150,16 @@ const ChatPage = () => {
           groupedMessages.map((message) => (
             <div
               key={message.id}
-              className={`mb-4 flex ${message.sender === currentUser ? 'justify-end' : 'justify-start'}`}
+              className={`mb-4 flex ${message.sender === currentUserId || message.sender === user?.subject ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-[20px] px-4 py-3 shadow-sm ${message.sender === currentUser ? 'bg-cyan-600 text-white' : 'bg-slate-800/90 text-slate-100'}`}
+                className={`max-w-[80%] rounded-[20px] px-4 py-3 shadow-sm ${message.sender === currentUserId || message.sender === user?.subject ? 'bg-cyan-600 text-white' : 'bg-slate-800/90 text-slate-100'}`}
               >
-                <div className="mb-1 text-sm font-semibold">{message.sender}</div>
+                <div className="mb-1 text-sm font-semibold">
+                  {message.sender === currentUserId || message.sender === user?.subject ? currentUserId || message.sender : message.sender}
+                </div>
                 <div className="break-words text-sm">{message.content || message.message}</div>
-                <div className={`mt-2 text-[11px] ${message.sender === currentUser ? 'text-cyan-100' : 'text-slate-400'}`}>
+                <div className={`mt-2 text-[11px] ${message.sender === currentUserId || message.sender === user?.subject ? 'text-cyan-100' : 'text-slate-400'}`}>
                   {formatTime(message.timeStamp)}
                 </div>
               </div>
