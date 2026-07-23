@@ -5,3 +5,12 @@ spring:
   mongodb:
     uri: mongodb://root:root@localhost:27017/chatAppDB?authSource=admin
 
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8181/realms/chat-app
+
+server:
+  port: 9000
