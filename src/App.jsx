@@ -6,6 +6,8 @@ import { ChatProvider } from './context/ChatContext';
 import { AuthProvider } from './context/AuthContext';
 import './App.css';
 
+console.log("App Loaded");
+
 function App() {
   return (
     <AuthProvider>

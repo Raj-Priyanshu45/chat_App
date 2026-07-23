@@ -5,9 +5,9 @@ import { getAuthToken, setAuthToken } from '../config/AxiosHelper';
 const AuthContext = createContext(null);
 
 const keycloakConfig = {
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8181/auth',
+  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8181/',
   realm: import.meta.env.VITE_KEYCLOAK_REALM || 'chat-app',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'chat-app-frontend',
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'vite-frontend',
 };
 
 const parseUser = (keycloak) => {
