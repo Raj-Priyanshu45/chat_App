@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import Keycloak from 'keycloak-js';
 import { getAuthToken, setAuthToken } from '../config/AxiosHelper';
 
@@ -9,6 +9,8 @@ const keycloakConfig = {
   realm: import.meta.env.VITE_KEYCLOAK_REALM || 'chat-app',
   clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'vite-frontend',
 };
+
+const kc = new Keycloak(keycloakConfig);
 
 const parseUser = (keycloak) => {
   const parsed = keycloak.tokenParsed || {};
@@ -26,9 +28,11 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(getAuthToken());
   const [user, setUser] = useState(null);
   const [keycloak, setKeycloak] = useState(null);
+  const isRun = useRef(false);
 
   useEffect(() => {
-    const kc = new Keycloak(keycloakConfig);
+    if (isRun.current) return;
+    isRun.current = true;
 
     kc.init({ onLoad: 'login-required', pkceMethod: 'S256' })
       .then((isAuthenticated) => {
@@ -45,7 +49,8 @@ export const AuthProvider = ({ children }) => {
 
         setAuthInitialized(true);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Keycloak init failed', err);
         setKeycloak(kc);
         setAuthInitialized(true);
       });

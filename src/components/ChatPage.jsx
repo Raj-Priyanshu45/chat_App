@@ -9,6 +9,9 @@ import { getWebSocketUrl } from '../config/AxiosHelper';
 import { getMessages } from '../services/RoomService';
 import { formatTime } from '../config/helper';
 
+// Log immediately when this file loads
+console.log('ChatPage.jsx file loaded - This proves you have the NEW version with logging!');
+
 const ChatPage = () => {
   const { roomId, currentUser, connected, setConnected, setRoomId, setCurrentUser } = useChatContext();
   const { authenticated, token, user, logout } = useAuth();
@@ -38,13 +41,17 @@ const ChatPage = () => {
   }, [connected, navigate, roomId]);
 
   useEffect(() => {
+    console.log('ChatPage useEffect triggered - authenticated:', authenticated, 'connected:', connected, 'roomId:', roomId, 'token exists:', !!token);
+
     if (!authenticated || !connected || !roomId || !token) {
+      console.warn('Missing auth conditions, returning');
       if (!authenticated) {
         navigate('/');
       }
       return undefined;
     }
 
+    console.log('Creating STOMP client with token');
     const client = new Client({
       brokerURL: getWebSocketUrl(),
       connectHeaders: {
@@ -52,28 +59,41 @@ const ChatPage = () => {
       },
       reconnectDelay: 5000,
       onConnect: () => {
+        console.log('✅ WebSocket connected successfully!');
         setStompClient(client);
         toast.success('Connected to chat');
-        client.subscribe(`/topic/room/${roomId}`, (message) => {
-          const payload = JSON.parse(message.body);
-          setMessages((prev) => [...prev, payload]);
-          scrollToBottom();
+        const subscription = client.subscribe(`/topic/room/${roomId}`, (message) => {
+          try {
+            const payload = JSON.parse(message.body);
+            console.log('📨 Message received from WebSocket:', payload);
+            setMessages((prev) => [...prev, payload]);
+            scrollToBottom();
+          } catch (error) {
+            console.error('❌ Error parsing message:', error);
+            toast.error('Error receiving message');
+          }
         });
+        console.log('✅ Subscription created for room:', roomId);
       },
       onStompError: (frame) => {
+        console.error('❌ STOMP error:', frame);
         toast.error(frame.body || 'WebSocket error.');
       },
-      onWebSocketError: () => {
+      onWebSocketError: (error) => {
+        console.error('❌ WebSocket error:', error);
         toast.error('Unable to connect to chat server.');
       },
       onDisconnect: () => {
+        console.log('WebSocket disconnected');
         setStompClient(null);
       },
     });
 
+    console.log('Activating STOMP client');
     client.activate();
 
     return () => {
+      console.log('Cleanup: Deactivating STOMP client');
       client.deactivate();
       setStompClient(null);
     };
@@ -98,18 +118,29 @@ const ChatPage = () => {
   };
 
   const sendMessage = () => {
-    if (!stompClient || !connected || !input.trim()) return;
+    console.log('🟡 sendMessage called - stompClient:', !!stompClient, 'connected:', connected, 'input:', input.trim());
+
+    if (!stompClient || !connected || !input.trim()) {
+      console.warn('❌ Cannot send message - missing conditions:', { stompClient: !!stompClient, connected, hasInput: !!input.trim() });
+      return;
+    }
 
     const payload = {
       message: input.trim(),
     };
 
-    stompClient.publish({
-      destination: `/app/sendMessages/${roomId}`,
-      body: JSON.stringify(payload),
-    });
-
-    setInput('');
+    try {
+      console.log('🟢 Sending message to room:', roomId, 'payload:', payload);
+      stompClient.publish({
+        destination: `/app/sendMessages/${roomId}`,
+        body: JSON.stringify(payload),
+      });
+      console.log('✅ Message published successfully');
+      setInput('');
+    } catch (error) {
+      console.error('❌ Failed to send message:', error);
+      toast.error('Failed to send message: ' + error.message);
+    }
   };
 
   const handleLogout = () => {
@@ -172,7 +203,7 @@ const ChatPage = () => {
                 <div
                   className="h-8 w-8 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-semibold"
                 >
-                  {message.sender[0].toUpperCase()}
+                  {(message.sender?.[0] || '?').toUpperCase()}
                 </div>
                 <div
                   className={`max-w-[80%] rounded-[20px] px-4 py-3 shadow-sm ${message.sender === currentUserId || message.sender === user?.subject ? 'bg-cyan-600 text-white' : 'bg-slate-800/90 text-slate-100 hover:bg-slate-700/50'}`}
@@ -180,7 +211,7 @@ const ChatPage = () => {
                   <div className="mb-1 text-sm font-semibold">
                     {message.sender === currentUserId || message.sender === user?.subject ? currentUserId || message.sender : message.sender}
                   </div>
-                  <div className="break-words text-sm">{message.content || message.message}</div>
+                  <div className="break-words text-sm">{message.content}</div>
                   <div className={`mt-2 text-[11px] ${message.sender === currentUserId || message.sender === user?.subject ? 'text-cyan-100' : 'text-slate-400'}`}>
                     {formatTime(message.timeStamp)}
                   </div>
