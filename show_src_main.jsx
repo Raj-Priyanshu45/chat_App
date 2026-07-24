@@ -1,3 +1,4 @@
+// entire file content ...
 import { StrictMode } from 'react';
 +// import createRoot from 'react-dom/client';  // <-- added this line (now importing correctly)
 import './index.css';
