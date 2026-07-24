@@ -1,5 +1,0 @@
-VITE_KEYCLOAK_URL=http://localhost:8181/
-VITE_KEYCLOAK_REALM=chat-app
-+ VITE_API_BASE_URL=http://localhost:9000  // Added this line for clarity and completeness
-
-// Other existing .env variables remain unchanged.

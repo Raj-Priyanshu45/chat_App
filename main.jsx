@@ -1,3 +1,0 @@
-// entire file content ...
-import AuthProvider from './auth/AuthProvider.jsx';  // Corrected import based on the error message and your instructions.
-... goes in between
