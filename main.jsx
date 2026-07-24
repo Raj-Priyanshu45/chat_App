@@ -1,1 +1,2 @@
-// entire content of main.jsx with updated import for AuthProvider as per your instructions.
+// entire content of main.jsx with 'see' replaced by 'se', assuming this is a code change you want.
+// ... goes here ...
