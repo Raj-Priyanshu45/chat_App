@@ -30,6 +30,10 @@ public class chatService {
 
         boolean userFlag = userRepo.existsByUsername(username);
 
+        log.warn("DEBUG - incoming username from principal: [{}]", username);
+        log.warn("DEBUG - roomFlag: {}, userFlag: {}", roomFlag, userFlag);
+
+
         if(!roomFlag){
             log.debug("Unknown Room");
             throw new RuntimeException("Room Not Found");

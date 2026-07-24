@@ -37,6 +37,8 @@ public class keyCloakConfig {
                     .collect(Collectors.toList());
         });
 
+        authConverter.setPrincipalClaimName("preferred_username");
+
         return authConverter;
     }
 }

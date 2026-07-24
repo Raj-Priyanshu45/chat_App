@@ -27,7 +27,7 @@ public class chatController {
                 //sending message
 
 
-    @PreAuthorize("hasRole('USER')")
+    // @PreAuthorize("hasRole('USER')")
     @MessageMapping("/sendMessages/{roomId}")
     //for sending and receiving message
     @SendTo("/topic/room/{roomId}")

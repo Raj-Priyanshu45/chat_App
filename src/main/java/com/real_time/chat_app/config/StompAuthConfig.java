@@ -1,6 +1,8 @@
 package com.real_time.chat_app.config;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.jspecify.annotations.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -8,21 +10,26 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class StompAuthConfig implements ChannelInterceptor {
 
     //provided by spring
     private final JwtDecoder jwtDecoder;
+
+    //for configuring the roles from jwt to prevent it getting null
+    private final JwtAuthenticationConverter jwtAuthenticationConverter;
+
 
 
     //override preSend method
@@ -47,16 +54,22 @@ public class StompAuthConfig implements ChannelInterceptor {
 
             String token = authHeader.getFirst().substring(7);
 
+            // Jwt jwt = jwtDecoder.decode(token);
+
+            // Authentication authentication =  jwtAuthenticationConverter.convert(jwt);
+
+            // accessor.setUser(authentication);
+
+
             Jwt jwt = jwtDecoder.decode(token);
 
-            Authentication authenticaton =
-                    new UsernamePasswordAuthenticationToken(
-                            jwt.getSubject() ,
-                            null ,
-                            List.of()
-                    );
+            log.warn("RAW JWT CLAIMS: {}", jwt.getClaims());
 
-            accessor.setUser(authenticaton);
+            Authentication authentication = jwtAuthenticationConverter.convert(jwt);
+
+            log.warn("CONVERTED PRINCIPAL NAME: {}", authentication.getName());
+
+            accessor.setUser(authentication);
         }
 
         return message;
