@@ -42,7 +42,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         //when front end calls ShockJs then this frontend endpoint will be called
         //browser sends request to this uri
         registry.addEndpoint("/chat")
-                .setAllowedOriginPatterns("http://localhost:[*]");
+                .setAllowedOriginPatterns("http://localhost:*");
 //                .withSockJS();
     }
 
