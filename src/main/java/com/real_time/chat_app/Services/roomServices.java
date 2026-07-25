@@ -9,6 +9,8 @@ import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.roomRepo;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class roomServices {
@@ -38,6 +41,8 @@ public class roomServices {
     }
 
     public Rooms retRoomDetails(String roomId) {
+
+        log.info("Request for join room");
         return repo.findByRoomId(roomId).orElse(null);
     }
 
@@ -48,6 +53,8 @@ public class roomServices {
         if(room == null) return null;
 
         List<Message> messages = messRepo.findByRoomId(roomId);
+
+        log.info("Request for retreiving message");
 
         int start = Math.max(0 , messages.size() - (page + 1) * size);
 
