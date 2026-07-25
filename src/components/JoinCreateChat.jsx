@@ -114,7 +114,7 @@ const JoinCreateChat = () => {
               <button
                 type="button"
                 onClick={joinChat}
-                className="flex-1 rounded-full bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+                className="flex-1 rounded-full bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-400"
                 disabled={!auth.authenticated}
               >
                 Join Room
@@ -122,7 +122,7 @@ const JoinCreateChat = () => {
               <button
                 type="button"
                 onClick={createRoom}
-                className="flex-1 rounded-full bg-orange-600 px-4 py-3 font-medium text-white transition hover:bg-orange-500 disabled:opacity-50"
+                className="flex-1 rounded-full bg-orange-600 px-4 py-3 font-medium text-white transition hover:bg-orange-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-400"
                 disabled={!auth.authenticated}
               >
                 Create Room
