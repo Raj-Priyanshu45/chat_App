@@ -1,1 +1,0 @@
-// Entire content of delete_src/services/websocket.js has been removed as it's no longer needed or referenced by the application. If you need WebSocket functionality, consider using context/AuthContext.jsx instead for a cleaner approach without redundant files.

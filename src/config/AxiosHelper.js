@@ -36,5 +36,6 @@ export const getWebSocketUrl = () => {
   const url = new URL(baseURL);
   url.protocol = url.protocol.replace(/^http/, 'ws');
   url.pathname = '/chat';
+  console.log('🔌 WebSocket URL resolved to:', url.toString());
   return url.toString();
 };
