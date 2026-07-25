@@ -50,6 +50,7 @@ const JoinCreateChat = () => {
       toast.success('Joined room successfully.');
       navigate('/chat');
     } catch (error) {
+      console.error('Join room failed:', error);
       const message = error?.response?.data || 'Unable to join room.';
       toast.error(message);
     }
@@ -71,6 +72,7 @@ const JoinCreateChat = () => {
       toast.success('Room created successfully.');
       navigate('/chat');
     } catch (error) {
+      console.error('Create room failed:', error);
       const message = error?.response?.data || 'Unable to create room.';
       toast.error(message);
     }
