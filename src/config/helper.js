@@ -29,3 +29,32 @@ export const formatTime = (value) => {
     minute: '2-digit',
   });
 };
+
+// Converts whatever shape the backend sent (array, object, or string) back into
+// a plain "YYYY-MM-DDTHH:mm:ss.SSSSSS" string with no timezone — this is the
+// only format Spring's @RequestParam LocalDateTime will parse without a 400.
+export const toBackendTimestamp = (value) => {
+  if (!value) return null;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  if (typeof value === 'string') {
+    return value.replace('Z', '');
+  }
+
+  if (Array.isArray(value) && value.length >= 6) {
+    const [year, month, day, hour, minute, second, nano = 0] = value;
+    const micros = String(Math.floor(nano / 1000)).padStart(6, '0');
+    return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}.${micros}`;
+  }
+
+  if (typeof value === 'object') {
+    const { year, monthValue, dayOfMonth, hour, minute, second, nano = 0 } = value;
+    if (typeof year === 'number' && typeof monthValue === 'number') {
+      const micros = String(Math.floor(nano / 1000)).padStart(6, '0');
+      return `${year}-${pad(monthValue)}-${pad(dayOfMonth)}T${pad(hour)}:${pad(minute)}:${pad(second)}.${micros}`;
+    }
+  }
+
+  return null;
+};

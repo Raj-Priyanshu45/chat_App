@@ -6,11 +6,8 @@ import { MdSend } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 import { getWebSocketUrl } from '../config/AxiosHelper';
-import { getMessages } from '../services/RoomService';
-import { formatTime } from '../config/helper';
-
-// Log immediately when this file loads
-console.log('ChatPage.jsx file loaded - This proves you have the NEW version with logging!');
+import { getMessages, getMessagesSince } from '../services/RoomService';
+import { formatTime, toBackendTimestamp } from '../config/helper';
 
 const ChatPage = () => {
   const { roomId, currentUser, connected, setConnected, setRoomId, setCurrentUser } = useChatContext();
@@ -19,6 +16,7 @@ const ChatPage = () => {
   const [input, setInput] = useState('');
   const [stompClient, setStompClient] = useState(null);
   const chatBoxRef = useRef(null);
+  const lastMessageTimestampRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,6 +29,9 @@ const ChatPage = () => {
       try {
         const loadedMessages = await getMessages(roomId);
         setMessages(loadedMessages);
+        if (loadedMessages.length > 0) {
+          lastMessageTimestampRef.current = loadedMessages[loadedMessages.length - 1].timeStamp;
+        }
         scrollToBottom();
       } catch {
         toast.error('Unable to load older messages.');
@@ -41,17 +42,13 @@ const ChatPage = () => {
   }, [connected, navigate, roomId]);
 
   useEffect(() => {
-    console.log('ChatPage useEffect triggered - authenticated:', authenticated, 'connected:', connected, 'roomId:', roomId, 'token exists:', !!token);
-
     if (!authenticated || !connected || !roomId || !token) {
-      console.warn('Missing auth conditions, returning');
       if (!authenticated) {
         navigate('/');
       }
       return undefined;
     }
 
-    console.log('Creating STOMP client with token');
     const client = new Client({
       brokerURL: getWebSocketUrl(),
       connectHeaders: {
@@ -59,41 +56,57 @@ const ChatPage = () => {
       },
       reconnectDelay: 5000,
       onConnect: () => {
-        console.log('✅ WebSocket connected successfully!');
         setStompClient(client);
         toast.success('Connected to chat');
-        const subscription = client.subscribe(`/topic/room/${roomId}`, (message) => {
+
+        client.subscribe(`/topic/room/${roomId}`, (message) => {
           try {
             const payload = JSON.parse(message.body);
-            console.log('📨 Message received from WebSocket:', payload);
             setMessages((prev) => [...prev, payload]);
+            lastMessageTimestampRef.current = payload.timeStamp;
             scrollToBottom();
-          } catch (error) {
-            console.error('❌ Error parsing message:', error);
+          } catch {
             toast.error('Error receiving message');
           }
         });
-        console.log('✅ Subscription created for room:', roomId);
+
+        // Fetch anything sent while we were disconnected (or between the
+        // initial history load and this connection being established).
+        if (lastMessageTimestampRef.current) {
+          const since = toBackendTimestamp(lastMessageTimestampRef.current);
+          if (since) {
+            getMessagesSince(roomId, since)
+              .then((missed) => {
+                if (!missed.length) return;
+                setMessages((prev) => {
+                  const existingIds = new Set(prev.map((m) => m.id));
+                  const newOnes = missed.filter((m) => !existingIds.has(m.id));
+                  if (!newOnes.length) return prev;
+                  lastMessageTimestampRef.current = newOnes[newOnes.length - 1].timeStamp;
+                  return [...prev, ...newOnes];
+                });
+                scrollToBottom();
+              })
+              .catch(() => {
+                toast.error('Unable to fetch missed messages.');
+              });
+          }
+        }
       },
       onStompError: (frame) => {
-        console.error('❌ STOMP error:', frame);
         toast.error(frame.body || 'WebSocket error.');
       },
-      onWebSocketError: (error) => {
-        console.error('❌ WebSocket error:', error);
+      onWebSocketError: () => {
         toast.error('Unable to connect to chat server.');
       },
       onDisconnect: () => {
-        console.log('WebSocket disconnected');
         setStompClient(null);
       },
     });
 
-    console.log('Activating STOMP client');
     client.activate();
 
     return () => {
-      console.log('Cleanup: Deactivating STOMP client');
       client.deactivate();
       setStompClient(null);
     };
@@ -118,10 +131,7 @@ const ChatPage = () => {
   };
 
   const sendMessage = () => {
-    console.log('🟡 sendMessage called - stompClient:', !!stompClient, 'connected:', connected, 'input:', input.trim());
-
     if (!stompClient || !connected || !input.trim()) {
-      console.warn('❌ Cannot send message - missing conditions:', { stompClient: !!stompClient, connected, hasInput: !!input.trim() });
       return;
     }
 
@@ -130,15 +140,12 @@ const ChatPage = () => {
     };
 
     try {
-      console.log('🟢 Sending message to room:', roomId, 'payload:', payload);
       stompClient.publish({
         destination: `/app/sendMessages/${roomId}`,
         body: JSON.stringify(payload),
       });
-      console.log('✅ Message published successfully');
       setInput('');
     } catch (error) {
-      console.error('❌ Failed to send message:', error);
       toast.error('Failed to send message: ' + error.message);
     }
   };
@@ -159,7 +166,7 @@ const ChatPage = () => {
   const groupedMessages = useMemo(() => {
     return messages.map((message, index) => ({
       ...message,
-      id: `${message.sender}-${message.content}-${index}`,
+      id: message.id || `${message.sender}-${message.content}-${index}`,
     }));
   }, [messages]);
 
@@ -197,12 +204,8 @@ const ChatPage = () => {
               key={message.id}
               className={`mb-4 flex ${message.sender === currentUserId || message.sender === user?.subject ? 'justify-end' : 'justify-start'}`}
             >
-              <div
-                className="flex items-center gap-2"
-              >
-                <div
-                  className="h-8 w-8 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-semibold"
-                >
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-semibold">
                   {(message.sender?.[0] || '?').toUpperCase()}
                 </div>
                 <div

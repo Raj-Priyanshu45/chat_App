@@ -16,3 +16,10 @@ export const getMessages = async (roomId, size = 20, page = 0) => {
   });
   return response.data.content || [];
 };
+
+export const getMessagesSince = async (roomId, timestamp) => {
+  const response = await httpClient.get(`/api/v1/room/${roomId}/since`, {
+    params: { timestamp },
+  });
+  return response.data || [];
+};
