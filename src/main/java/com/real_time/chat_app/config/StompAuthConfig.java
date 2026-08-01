@@ -1,5 +1,7 @@
 package com.real_time.chat_app.config;
 
+import com.real_time.chat_app.Models.Rooms;
+import com.real_time.chat_app.Repo.roomRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,6 +20,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class StompAuthConfig implements ChannelInterceptor {
 
     //provided by spring
     private final JwtDecoder jwtDecoder;
+    private final roomRepo roomRepo;
 
     //for configuring the roles from jwt to prevent it getting null
     private final JwtAuthenticationConverter jwtAuthenticationConverter;
@@ -41,8 +45,10 @@ public class StompAuthConfig implements ChannelInterceptor {
                 MessageHeaderAccessor.getAccessor(message , StompHeaderAccessor.class);
 
 
+        if(accessor == null) return message;
+
         //check if the command is Connect
-        if(accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())){
+        if(StompCommand.CONNECT.equals(accessor.getCommand())){
 
             //extract the header
 
@@ -72,7 +78,35 @@ public class StompAuthConfig implements ChannelInterceptor {
             accessor.setUser(authentication);
         }
 
+        if (StompCommand.SEND.equals(accessor.getCommand()) || StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
+
+            String destination = accessor.getDestination();
+            assert destination != null;
+            String roomId = extractRoomId(destination);
+            String userName = Objects.requireNonNull(accessor.getUser()).getName();
+
+            Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
+
+            if(room == null || !room.getUsers().contains(userName)){
+                throw new RuntimeException("Not a member of this room");
+            }
+        }
+
         return message;
+    }
+
+    private String extractRoomId(String message){
+
+        StringBuilder sb = new StringBuilder();
+        int count = 0;
+
+        for(int i = 0 ; i < message.length() ; i++){
+            if(count > 2) sb.append(message.charAt(i));
+
+            if(message.charAt(i) == '/') count++;
+        }
+
+        return sb.toString();
     }
 }
 

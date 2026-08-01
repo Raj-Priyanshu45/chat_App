@@ -6,16 +6,21 @@ import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Services.roomServices;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
 @RequiredArgsConstructor
+@Slf4j
 public class roomController {
 
     private final roomServices roomServices;
@@ -46,6 +51,8 @@ public class roomController {
         if(room == null)
             return ResponseEntity.status(404).body("Room Not Found");
 
+        log.info("Request for join room {} completed", roomId);
+
         return ResponseEntity.ok(room);
     }
 
@@ -64,5 +71,12 @@ public class roomController {
         }
 
         return ResponseEntity.ok(messages);
+    }
+
+
+    @GetMapping("/{roomId}/since")
+    @PreAuthorize("hasRole('USER')")
+    public List<Message> reconnectEndpoint(@RequestParam LocalDateTime timestamp , @PathVariable String roomId){
+        return roomServices.retMessSince(roomId , timestamp);
     }
 }

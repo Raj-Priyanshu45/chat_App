@@ -5,8 +5,10 @@ import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Services.chatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +35,7 @@ public class chatController {
     @SendTo("/topic/room/{roomId}")
     //for subscribe to channel
     //used to publish message to all the topic or groups
+//    @PreAuthorize("isAuthenticated()")
     public Message sendMessage(
             @DestinationVariable String roomId ,
             @RequestBody MessageRequest request ,
@@ -40,5 +43,12 @@ public class chatController {
     ){
 
         return chatService.sendMessage(request , roomId , principal.getName());
+    }
+
+
+    @MessageExceptionHandler(RuntimeException.class)
+    @SendToUser("/queue/errors")
+    public String handleException(RuntimeException e){
+        return e.getMessage();
     }
 }

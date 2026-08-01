@@ -13,8 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -31,10 +34,23 @@ public class roomServices {
 
         Rooms room = repo.findByRoomId(roomId.roomId()).orElse(null);
 
+        String kcId = ((Jwt) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal())
+                .getSubject();
+
+        if(kcId == null || kcId.isEmpty())  return null;
+
+
+        Users user = userRepo.findByKcId(kcId).orElse(null);
+
+        if(user == null) return null;
+
         if(room != null) return null;
 
         Rooms newRoom = Rooms.builder()
                 .roomId(roomId.roomId())
+                .users(List.of(user.getUsername()))
                 .build();
 
         return repo.save(newRoom);
@@ -42,8 +58,28 @@ public class roomServices {
 
     public Rooms retRoomDetails(String roomId) {
 
+        String kcId = ((Jwt) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal())
+                .getSubject();
+
+        if(kcId == null || kcId.isEmpty())  return null;
+
+
+        Users user = userRepo.findByKcId(kcId).orElse(null);
+
+        if (user == null) return null;
+
         log.info("Request for join room");
-        return repo.findByRoomId(roomId).orElse(null);
+        Rooms room = repo.findByRoomId(roomId).orElse(null);
+
+        if(room == null)  return null;
+
+        room.getUsers().add(user.getUsername());
+
+        repo.save(room);
+
+        return room;
     }
 
     public Page<Message> retAllMess(String roomId , int page , int size) {
@@ -63,5 +99,9 @@ public class roomServices {
         List<Message> pagedMessage = messages.subList(start , end);
 
         return new PageImpl<>(pagedMessage);
+    }
+
+    public List<Message> retMessSince(String roomId, LocalDateTime timestamp) {
+        return messRepo.findByRoomIdAndTimeStampAfterOrderByTimeStampAsc(roomId , timestamp);
     }
 }
