@@ -75,9 +75,11 @@ public class roomServices {
 
         if(room == null)  return null;
 
-        room.getUsers().add(user.getUsername());
+        if(!room.getUsers().contains(user.getUsername())) {
 
-        repo.save(room);
+            room.getUsers().add(user.getUsername());
+            repo.save(room);
+        }
 
         return room;
     }

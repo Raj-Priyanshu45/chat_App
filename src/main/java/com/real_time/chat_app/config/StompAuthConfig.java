@@ -78,17 +78,21 @@ public class StompAuthConfig implements ChannelInterceptor {
             accessor.setUser(authentication);
         }
 
-        if (StompCommand.SEND.equals(accessor.getCommand()) || StompCommand.SUBSCRIBE.equals(accessor.getCommand())){
+        if (StompCommand.SEND.equals(accessor.getCommand()) || StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
 
             String destination = accessor.getDestination();
-            assert destination != null;
-            String roomId = extractRoomId(destination);
-            String userName = Objects.requireNonNull(accessor.getUser()).getName();
 
-            Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
+            if (destination != null &&
+                    (destination.startsWith("/app/sendMessages/") || destination.startsWith("/topic/room/"))) {
 
-            if(room == null || !room.getUsers().contains(userName)){
-                throw new RuntimeException("Not a member of this room");
+                String roomId = extractRoomId(destination);
+                String userName = Objects.requireNonNull(accessor.getUser()).getName();
+
+                Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
+
+                if (room == null || !room.getUsers().contains(userName)) {
+                    throw new RuntimeException("Not a member of this room");
+                }
             }
         }
 
