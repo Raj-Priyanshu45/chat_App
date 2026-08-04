@@ -90,7 +90,7 @@ public class StompAuthConfig implements ChannelInterceptor {
 
                 Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
 
-                if (room == null || !room.getUsers().contains(userName)) {
+                if (room == null || !room.getAvlUser().contains(userName)) {
                     throw new RuntimeException("Not a member of this room");
                 }
             }

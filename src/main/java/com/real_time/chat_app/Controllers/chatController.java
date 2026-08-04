@@ -51,7 +51,7 @@ public class chatController {
             @RequestBody MessageRequest request ,
             Principal principal
     ){
-        return chatService.sendDm(username , request , principal.getName());
+        return chatService.sendDm(principal.getName() , request , username);
     }
 
     @MessageExceptionHandler(RuntimeException.class)
