@@ -19,7 +19,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
-public class ImageVideoService {
+public class DmFileUploadService {
 
     private final MessRepo messRepo;
     private final SimpMessagingTemplate messagingTemplate;
@@ -53,21 +53,18 @@ public class ImageVideoService {
             "audio/aac", "audio/flac", "audio/opus", "audio/amr"
     );
 
-    public List<Message> uploadFiles(MultipartFile[] files, String sender, String roomId) throws IOException {
+    public List<Message> uploadFiles(MultipartFile[] files, String sender, String rec) throws IOException {
 
         List<Message> saved = new ArrayList<>();
 
-        Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
-
-        if(room == null) throw new RuntimeException("Room not found");
 
         for (MultipartFile file : files) {
-            saved.add(checkAndUpload(file, sender, room));
+            saved.add(checkAndUpload(file, sender, rec));
         }
         return saved;
     }
 
-    private Message checkAndUpload(MultipartFile file, String sender, Rooms room) throws IOException {
+    private Message checkAndUpload(MultipartFile file, String sender, String rec) throws IOException {
 
         if (file.isEmpty()) throw new RuntimeException("File Not Found");
 
@@ -85,30 +82,41 @@ public class ImageVideoService {
             if (!extensions.contains(extension)) throw new RuntimeException("Invalid extensions");
             if (size > maxImageSize) throw new RuntimeException("File to large");
 
-            return saveFile(file, extension, room, sender, Content_Type.IMAGE);
+            return saveFile(file, extension, rec, sender, Content_Type.IMAGE);
 
         } else if (VIDEO_TYPES.contains(contentType)) {
 
             if (!videoExtensions.contains(extension)) throw new RuntimeException("Invalid extensions");
             if (size > maxVideoSize) throw new RuntimeException("File to large");
 
-            return saveFile(file, extension, room, sender, Content_Type.VIDEO);
+            return saveFile(file, extension, rec, sender, Content_Type.VIDEO);
 
         } else if (AUDIO_TYPES.contains(contentType)) {
 
             if (!AUDIO_EXTENSIONS.contains(extension)) throw new RuntimeException("Invalid extensions");
             if (size > maxAudioSize) throw new RuntimeException("File to large");
 
-            return saveFile(file, extension, room, sender, Content_Type.AUDIO);
+            return saveFile(file, extension, rec, sender, Content_Type.AUDIO);
 
         } else {
             throw new RuntimeException("Invalid Content type");
         }
     }
 
-    private Message saveFile(MultipartFile file, String extension, Rooms room , String sender, Content_Type type) throws IOException {
+    private Message saveFile(MultipartFile file, String extension, String rec , String sender, Content_Type type) throws IOException {
 
         String newFilename = UUID.randomUUID() + "_" + UUID.randomUUID() + "." + extension;
+
+        String roomId = "";
+
+        boolean flag1 = roomRepo.existsByRoomId(sender + rec);
+        boolean flag2 = roomRepo.existsByRoomId(rec + sender);
+
+        if(flag1) roomId = sender+rec;
+
+        if(flag2) roomId = rec+sender;
+
+        if(Objects.equals(roomId , "")) throw new RuntimeException("Internal Server error");
 
         Path uploadDir = Paths.get("/home/devxraj/Java/ChatAppStorage");
         Files.createDirectories(uploadDir);
@@ -119,11 +127,19 @@ public class ImageVideoService {
                 StandardCopyOption.REPLACE_EXISTING
         );
 
-        Message saved = messRepo.save(new Message(room.getRoomId() , sender, newFilename, type));
+        Message saved = messRepo.save(new Message(roomId , sender, newFilename, type));
 
-        // Broadcast to everyone subscribed to the room — this is what makes the
-        // upload appear live for other users, same role @SendTo plays for text.
-        messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId(), saved);
+        messagingTemplate.convertAndSendToUser(
+                sender ,
+                "/queue/dm",
+                saved
+        );
+
+        messagingTemplate.convertAndSendToUser(
+                rec ,
+                "/queue/dm",
+                saved
+        );
 
         return saved;
     }

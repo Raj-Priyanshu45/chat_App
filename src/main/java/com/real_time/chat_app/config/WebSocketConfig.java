@@ -23,7 +23,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         //this is used to send message directly is user is there
         //Deliver new messages instantly to clients that are currently connected and subscribed.
-        config.enableSimpleBroker("/topic");
+        config.enableSimpleBroker("/topic" , "/queue");
 
         //it is used to store mess to db
         //it makes request to backend

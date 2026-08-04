@@ -43,15 +43,39 @@ public class chatController {
         return chatService.sendMessage(request, roomId, principal.getName());
     }
 
+    @MessageMapping("dm/{username}")
+    public Message dmMessage(
+            @DestinationVariable String username ,
+            @RequestBody MessageRequest request ,
+            Principal principal
+    ){
+        return chatService.sendDm(username , request , principal.getName());
+    }
+
     @MessageExceptionHandler(RuntimeException.class)
     @SendToUser("/queue/errors")
     public String handleException(RuntimeException e) {
         return e.getMessage();
     }
 
+
+
     @PostMapping("/upload/{roomId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> saveFile(
+            @PathVariable String roomId,
+            @RequestParam("files") MultipartFile[] files,
+            Principal principal
+    ) throws IOException {
+
+        return ResponseEntity.ok(
+                fileService.uploadFiles(files, principal.getName(), roomId)
+        );
+    }
+
+    @PostMapping("/dm/{roomId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> sendDmFiles(
             @PathVariable String roomId,
             @RequestParam("files") MultipartFile[] files,
             Principal principal
@@ -81,4 +105,5 @@ public class chatController {
                 .contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }
+
 }

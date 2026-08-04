@@ -18,3 +18,589 @@ The broadcast payload is just the Message document — sender, timestamp, type, 
 So MediaMessage does its own separate step when it actually renders: it calls fetchMediaBlob(filename), which is a normal authenticated axios GET to /api/v1/chat/ret/{filename} — a completely different request path from the WebSocket broadcast, happening independently for each client, each time that message needs to be displayed. The response comes back as binary (responseType: 'blob'), and URL.createObjectURL(...) turns those bytes into a temporary local URL the browser can point an <img>/<video>/<audio> tag at.
 
 So there are really two separate delivery mechanisms working together: STOMP broadcast tells everyone "a new file exists, here's its name," and REST fetch is how each client actually pulls the bytes down, on demand, only when rendering that message. That split is the same pattern most production chat apps use (Slack, Discord, etc.) — the realtime channel carries small event/metadata payloads, and actual media is fetched over HTTP separately, often from a CDN. You've basically built a miniature version of that same architecture, which is worth mentioning if this ever comes up in an interview.
+
+
+
+
+
+
+
+
+
+
+What is the message broker?
+
+When you configure:
+
+@Override
+public void configureMessageBroker(MessageBrokerRegistry registry) {
+    registry.enableSimpleBroker("/topic", "/queue");
+    registry.setApplicationDestinationPrefixes("/app");
+}
+
+Spring creates an in-memory message broker.
+
+Think of it as a router.
+
+           Message Broker
+          ----------------
+          /topic/room/1
+          /topic/room/2
+          /queue/errors
+          /user/queue/...
+
+It keeps track of:
+
+Who is subscribed to which destination?
+
+For example:
+
+Alice
+ ├── /topic/room/1
+ └── /user/queue/errors
+
+Bob
+ ├── /topic/room/1
+ └── /topic/room/2
+
+Charlie
+ └── /topic/room/2
+
+When you do
+
+messagingTemplate.convertAndSend("/topic/room/1", message);
+
+the broker checks
+
+Who subscribes to /topic/room/1?
+
+Answer:
+
+Alice
+Bob
+
+Then it sends the message only to them.
+
+
+
+
+
+
+
+So who owns the subscription?
+
+The client.
+
+Not Spring.
+
+Not your service.
+
+The client.
+
+The protocol says
+
+CONNECT
+
+↓
+
+SUBSCRIBE
+
+↓
+
+SEND
+
+↓
+
+UNSUBSCRIBE
+
+↓
+
+DISCONNECT
+
+The client sends every one of those frames.
+
+
+Spring work is only to deliver and check al those subs and unsubscribe can not be controlled by spring done in front end
+
+
+
+
+
+
+Then how do enterprise chat systems solve this?
+
+This is where architecture matters.
+
+Many large chat systems do not use /topic/room/{id} directly for authorization-sensitive messaging.
+
+Instead they send to individual users.
+
+Imagine room 1 has
+
+Alice
+Bob
+Charlie
+
+Instead of
+
+convertAndSend("/topic/room/1",msg);
+
+they do
+
+convertAndSendToUser("Alice",...)
+convertAndSendToUser("Bob",...)
+convertAndSendToUser("Charlie",...)
+
+Where do they get Alice, Bob, Charlie?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Step 1: Alice clicks Leave Room
+
+Frontend calls
+
+POST /rooms/room1/leave
+Step 2: Backend removes membership
+roomService.leaveRoom(roomId, username);
+
+Mongo becomes
+
+room1
+
+Bob
+Charlie
+
+Alice is gone.
+
+Step 3: Backend tells ONLY Alice
+messagingTemplate.convertAndSendToUser(
+    principal.getName(),
+    "/queue/room-events",
+    Map.of(
+        "type","LEFT_ROOM",
+        "roomId",roomId
+    )
+);
+
+Spring sends
+
+{
+  "type":"LEFT_ROOM",
+  "roomId":"room1"
+}
+
+to
+
+/user/queue/room-events
+
+Only Alice receives it.
+
+Step 4: Frontend receives it
+
+Remember this?
+
+stompClient.subscribe(
+    "/user/queue/room-events",
+    onRoomEvent
+);
+
+Now
+
+function onRoomEvent(frame){
+
+    const event = JSON.parse(frame.body);
+
+}
+
+event is
+
+{
+   type:"LEFT_ROOM",
+   roomId:"room1"
+}
+Step 5: NOW THE IMPORTANT PART
+
+The frontend already saved the room subscription.
+
+const roomSubscriptions = new Map();
+
+roomSubscriptions.set(roomId, roomSub);
+
+When it receives
+
+LEFT_ROOM
+
+it executes
+
+roomSubscriptions
+        .get(event.roomId)
+        .unsubscribe();
+
+roomSubscriptions.delete(event.roomId);
+
+That line sends
+
+UNSUBSCRIBE
+id=sub-17
+
+to Spring.
+
+Step 6: Spring removes it
+
+Spring receives
+
+UNSUBSCRIBE
+id=sub-17
+
+and internally removes
+
+Session123
+
+from
+
+/topic/room/room1
+
+Now when you later execute
+
+messagingTemplate.convertAndSend(
+        "/topic/room/room1",
+        message
+);
+
+Alice is no longer in the subscriber list.
+
+Only Bob and Charlie receive it.
+
+So the backend NEVER unsubscribes
+
+The backend only says
+
+Alice,
+
+You left room1.
+
+The frontend decides
+
+Oh.
+
+I should unsubscribe from room1.
+
+
+
+
+
+
+
+
+
+
+
+
+What is enableSimpleBroker("/topic", "/queue")?
+registry.enableSimpleBroker("/topic", "/queue");
+
+This tells Spring:
+
+"Whenever a client subscribes to a destination starting with /topic or /queue, I (Spring's broker) will manage those subscriptions and deliver messages."
+
+It doesn't create two different brokers.
+
+There is one broker that manages destinations under different prefixes.
+
+Think of it like this:
+
+SimpleBroker
+│
+├── /topic
+│      ├── /room/1
+│      ├── /room/2
+│      └── /news
+│
+└── /queue
+       ├── /errors
+       ├── /room-events
+       └── /notifications
+What is /topic?
+
+/topic is one publisher → many subscribers.
+
+Example:
+
+Server
+   │
+convertAndSend("/topic/room/1")
+   │
+   ▼
+Simple Broker
+   │
+   ├── Alice
+   ├── Bob
+   └── Charlie
+
+Everyone receives it.
+
+Typical uses:
+
+Chat room
+Live scores
+Stock prices
+News feed
+What is /queue?
+
+/queue is intended for point-to-point (single user) messaging.
+
+Normally used together with
+
+convertAndSendToUser(...)
+
+Example:
+
+messagingTemplate.convertAndSendToUser(
+        "alice",
+        "/queue/errors",
+        "Invalid token"
+);
+
+Only Alice receives it.
+
+The frontend subscribes to
+
+/user/queue/errors
+
+Spring internally maps it to Alice's session.
+
+Typical uses:
+
+Errors
+Notifications
+Room events
+Friend requests
+"You were kicked"
+Why is it called queue?
+
+Historically, in messaging systems:
+
+Topic
+
+means
+
+One message
+
+↓
+
+Many receivers
+
+while
+
+Queue
+
+means
+
+One message
+
+↓
+
+One receiver
+
+Spring follows the same terminology.
+
+Does Spring build the subscription list itself?
+
+Yes.
+
+You never write code like:
+
+Map<String,List<User>>
+
+for STOMP subscriptions.
+
+Spring builds and maintains it automatically.
+
+Suppose three clients connect.
+
+Alice
+
+CONNECT
+
+Bob
+
+CONNECT
+
+Charlie
+
+CONNECT
+
+Spring creates three WebSocket sessions.
+
+Session A
+Session B
+Session C
+
+Alice subscribes
+
+SUBSCRIBE
+destination=/topic/room/1
+
+Spring stores something conceptually like:
+
+/topic/room/1
+
+↓
+
+Session A
+
+Bob subscribes
+
+SUBSCRIBE
+destination=/topic/room/1
+
+Spring updates
+
+/topic/room/1
+
+↓
+
+Session A
+Session B
+
+Charlie subscribes
+
+SUBSCRIBE
+destination=/topic/room/2
+
+Spring now has
+
+/topic/room/1
+
+↓
+
+Session A
+Session B
+
+
+/topic/room/2
+
+↓
+
+Session C
+
+You never create these maps.
+
+Does it use my Room entity?
+
+No.
+
+This is the biggest misconception.
+
+Spring has zero knowledge of your MongoDB models.
+
+Suppose your entity is
+
+class Room{
+
+    String roomId;
+
+    List<Users> users;
+
+}
+
+Spring never reads this.
+
+It doesn't know:
+
+Room
+MongoDB
+Users collection
+Membership
+
+It only knows STOMP frames.
+
+Spring only sees this
+CONNECT
+
+SUBSCRIBE
+destination=/topic/room/1
+
+SEND
+
+UNSUBSCRIBE
+
+DISCONNECT
+
+That's it.
+
+It has no idea whether the subscriber is actually a member of your room.
+
+Then what does your Room model do?
+
+Your Room model is business logic.
+
+For example:
+
+Mongo
+
+room1
+
+Alice
+Bob
+Charlie
+
+You use it to answer questions like:
+
+Can Alice send messages?
+Can Bob join?
+Who are the members?
+Is Charlie an admin?
+
+Spring never uses it.
+
+So there are actually two maps
+Your application
+Mongo
+
+room1
+
+Alice
+Bob
+Charlie
+
+This is business membership.
+
+Spring
+/topic/room/1
+
+Session A
+Session B
+Session C
+
+This is WebSocket subscription state.
+
+These two maps are completely independent.
+
+That's why when someone leaves a room, you have to:
+
+Remove them from Mongo (your business state).
+Notify their client so it unsubscribes (Spring's subscription state).
+Summary
+Question	Answer
+Who maintains STOMP subscriptions?	Spring's SimpleBroker
+Does it use my Room entity?	❌ No
+Does it use my MongoDB?	❌ No
+What does it store?	WebSocket sessions and subscribed destinations
+What is /topic?	Broadcast (one sender → many subscribers)
+What is /queue?	Private or point-to-point messaging, usually with convertAndSendToUser()
+Who manages room membership?	Your application (MongoDB + services)
+Who manages subscriptions?	The STOMP client and Spring's broker together

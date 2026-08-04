@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import java.net.URI;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
@@ -27,6 +29,7 @@ import java.util.List;
 public class roomController {
 
     private final roomServices roomServices;
+    private final SimpMessagingTemplate messagingTemplate;
 
     //create rooms
     @PreAuthorize("hasRole('USER')")
@@ -46,7 +49,7 @@ public class roomController {
 
 
     @PreAuthorize("hasRole('USER')")
-    @GetMapping("/{roomId}")
+    @PostMapping("/join")
     public ResponseEntity<?> getRoom(@RequestBody joinRoom roomInfo){
 
         Rooms room = roomServices.retRoomDetails(roomInfo);
@@ -90,6 +93,15 @@ public class roomController {
             Principal principal
     ){
         roomServices.leaveRoom(roomId , principal.getName());
+
+        messagingTemplate.convertAndSendToUser(
+                principal.getName() ,
+                "/queue/room-events" ,
+                Map.of(
+                        "type" , "LEFT_ROOM" ,
+                        "roomId" , roomId
+                )
+        );
 
         return ResponseEntity.status(200).build();
     }

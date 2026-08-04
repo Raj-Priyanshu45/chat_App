@@ -41,4 +41,6 @@ public class Rooms {
     private Set<String> avlUser = new HashSet<>();
 
     private int numberAvlUser;
+
+
 }
