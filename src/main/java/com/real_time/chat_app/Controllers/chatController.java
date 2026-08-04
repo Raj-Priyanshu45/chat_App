@@ -2,6 +2,7 @@ package com.real_time.chat_app.Controllers;
 
 import com.real_time.chat_app.DTOs.MessageRequest;
 import com.real_time.chat_app.Models.Message;
+import com.real_time.chat_app.Services.DmFileUploadService;
 import com.real_time.chat_app.Services.ImageVideoService;
 import com.real_time.chat_app.Services.chatService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class chatController {
 
     private final chatService chatService;
     private final ImageVideoService fileService;
+    private final DmFileUploadService dmService;
 
     @MessageMapping("/sendMessages/{roomId}")
     @SendTo("/topic/room/{roomId}")
@@ -43,7 +45,7 @@ public class chatController {
         return chatService.sendMessage(request, roomId, principal.getName());
     }
 
-    @MessageMapping("dm/{username}")
+    @MessageMapping("/dm/{username}")
     public Message dmMessage(
             @DestinationVariable String username ,
             @RequestBody MessageRequest request ,
@@ -73,16 +75,16 @@ public class chatController {
         );
     }
 
-    @PostMapping("/dm/{roomId}")
+    @PostMapping("/dm/{rec}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> sendDmFiles(
-            @PathVariable String roomId,
+            @PathVariable String rec,
             @RequestParam("files") MultipartFile[] files,
             Principal principal
     ) throws IOException {
 
         return ResponseEntity.ok(
-                fileService.uploadFiles(files, principal.getName(), roomId)
+                dmService.uploadFiles(files, principal.getName(), rec)
         );
     }
 

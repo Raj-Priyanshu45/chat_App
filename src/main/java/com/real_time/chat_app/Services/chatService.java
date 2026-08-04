@@ -67,17 +67,17 @@ public class chatService {
 
         //TODO: get or create the room first then create mess object send and then return
 
-        boolean flag1 = roomRepo.existsByRoomId(user1+user2);
+        String roomId = getDmRoomId(user1 , user2);
 
-        boolean flag2 = roomRepo.existsByRoomId(user2+user1);
+        boolean flag = roomRepo.existsByRoomId(roomId);
 
         Rooms room;
 
         //room id , user list , scope , pass , time , avl , number
 
-        if( !(flag1 || flag2) ){
+        if( !flag ){
             room = Rooms.builder()
-                    .roomId(user1+user2)
+                    .roomId(roomId)
                     .timeStamp(LocalDateTime.now())
                     .users(List.of(user1 , user2))
                     .scopeVar(ScopeVar.DM)
@@ -87,9 +87,7 @@ public class chatService {
                     .build();
         }else{
 
-            if(flag1) room = roomRepo.findByRoomId(user1+user2).orElse(null);
-
-            else room = roomRepo.findByRoomId(user2+user1).orElse(null);
+            room = roomRepo.findByRoomId(roomId).orElse(null);
         }
 
         if(room == null) throw new RuntimeException("Internal Server Error");
@@ -109,5 +107,9 @@ public class chatService {
         );
 
         return messRepo.save(message);
+    }
+
+    private String getDmRoomId(String user1 , String user2){
+        return user1.compareTo(user2) < 0 ? user1 + user2 : user2 + user1;
     }
 }

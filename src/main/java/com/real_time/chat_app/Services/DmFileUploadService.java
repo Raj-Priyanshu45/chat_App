@@ -107,16 +107,11 @@ public class DmFileUploadService {
 
         String newFilename = UUID.randomUUID() + "_" + UUID.randomUUID() + "." + extension;
 
-        String roomId = "";
+        String roomId = getDmRoomId(sender , rec);
 
-        boolean flag1 = roomRepo.existsByRoomId(sender + rec);
-        boolean flag2 = roomRepo.existsByRoomId(rec + sender);
+        boolean flag = roomRepo.existsByRoomId(roomId);
 
-        if(flag1) roomId = sender+rec;
-
-        if(flag2) roomId = rec+sender;
-
-        if(Objects.equals(roomId , "")) throw new RuntimeException("Internal Server error");
+        if(!flag) throw new RuntimeException("Internal Server error");
 
         Path uploadDir = Paths.get("/home/devxraj/Java/ChatAppStorage");
         Files.createDirectories(uploadDir);
@@ -162,5 +157,10 @@ public class DmFileUploadService {
         if (!flag) throw new RuntimeException("Invalid extensions");
 
         return sb.reverse().toString().toLowerCase();
+    }
+
+
+    private String getDmRoomId(String sender , String rec){
+        return sender.compareTo(rec) < 0 ? sender + rec : rec + sender;
     }
 }

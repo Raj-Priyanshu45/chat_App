@@ -136,13 +136,13 @@ public class roomServices {
         return repo.findByScopeVar(ScopeVar.Public , pageable);
     }
 
-    public void leaveRoom(String roomId , String kcId){
+    public void leaveRoom(String roomId , String userId){
 
         Rooms room = repo.findByRoomId(roomId).orElse(null);
 
         if(room == null) return;
 
-        Users user = userRepo.findByKcId(kcId).orElse(null);
+        Users user = userRepo.findByUsername(userId).orElse(null);
 
         if(user == null) return;
 
