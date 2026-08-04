@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
 import toast from 'react-hot-toast';
-import { MdSend } from 'react-icons/md';
+import { MdSend, MdAttachFile } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 import { getWebSocketUrl } from '../config/AxiosHelper';
-import { getMessages, getMessagesSince } from '../services/RoomService';
+import { getMessages, getMessagesSince, leaveRoomApi } from '../services/RoomService';
 import { formatTime, toBackendTimestamp } from '../config/helper';
+import MediaMessage from './MediaMessage';
 
 const ChatPage = () => {
   const { roomId, currentUser, connected, setConnected, setRoomId, setCurrentUser } = useChatContext();
@@ -16,6 +17,7 @@ const ChatPage = () => {
   const [input, setInput] = useState('');
   const [stompClient, setStompClient] = useState(null);
   const chatBoxRef = useRef(null);
+  const fileInputRef = useRef(null);
   const lastMessageTimestampRef = useRef(null);
   const navigate = useNavigate();
 
@@ -70,8 +72,10 @@ const ChatPage = () => {
           }
         });
 
-        // Fetch anything sent while we were disconnected (or between the
-        // initial history load and this connection being established).
+        client.subscribe('/user/queue/errors', (message) => {
+          toast.error(message.body);
+        });
+
         if (lastMessageTimestampRef.current) {
           const since = toBackendTimestamp(lastMessageTimestampRef.current);
           if (since) {
@@ -150,16 +154,38 @@ const ChatPage = () => {
     }
   };
 
-  const handleLogout = () => {
-    if (stompClient) {
-      stompClient.deactivate();
+  const handleFileSelect = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    try {
+      await uploadFileApi(roomId, files);
+      // No need to add anything to state here — the backend broadcasts the
+      // saved message over /topic/room/{roomId}, so it arrives through the
+      // same subscription as any other message.
+    } catch (error) {
+      const message = error?.response?.data || 'Upload failed.';
+      toast.error(typeof message === 'string' ? message : 'Upload failed.');
+    } finally {
+      event.target.value = '';
     }
-    setConnected(false);
-    setRoomId('');
-    setCurrentUser('');
-    logout();
-    navigate('/');
   };
+
+  const handleLogout = async () => {
+  if (stompClient) {
+    stompClient.deactivate();
+  }
+  try {
+    await leaveRoomApi(roomId);
+  } catch {
+    // non-blocking — don't stop navigation if this fails
+  }
+  setConnected(false);
+  setRoomId('');
+  setCurrentUser('');
+  logout();
+  navigate('/');
+};
 
   const currentUserId = currentUser || user?.username || user?.name || user?.subject || '';
 
@@ -214,7 +240,13 @@ const ChatPage = () => {
                   <div className="mb-1 text-sm font-semibold">
                     {message.sender === currentUserId || message.sender === user?.subject ? currentUserId || message.sender : message.sender}
                   </div>
-                  <div className="break-words text-sm">{message.content}</div>
+
+                  {message.type === 'IMAGE' || message.type === 'VIDEO' || message.type === 'AUDIO' ? (
+                    <MediaMessage filename={message.content} type={message.type} />
+                  ) : (
+                    <div className="break-words text-sm">{message.content}</div>
+                  )}
+
                   <div className={`mt-2 text-[11px] ${message.sender === currentUserId || message.sender === user?.subject ? 'text-cyan-100' : 'text-slate-400'}`}>
                     {formatTime(message.timeStamp)}
                   </div>
@@ -227,6 +259,21 @@ const ChatPage = () => {
 
       <footer className="border-t border-slate-800/70 bg-slate-900/80 px-4 py-4 shadow-inner backdrop-blur sm:px-6">
         <div className="mx-auto flex max-w-6xl items-center gap-3 rounded-full border border-slate-700 bg-slate-800/90 px-3 py-3 focus-within:border-cyan-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-cyan-600">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            className="hidden"
+            accept="image/*,video/*,audio/*"
+            multiple
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-full border border-slate-700 p-3 transition hover:bg-slate-800"
+          >
+            <MdAttachFile size={18} />
+          </button>
           <input
             value={input}
             onChange={(event) => setInput(event.target.value)}

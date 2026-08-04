@@ -7,7 +7,7 @@ import { createRoomApi, joinChatApi } from '../services/RoomService';
 import { getMyInfo } from '../services/UserService';
 
 const JoinCreateChat = () => {
-  const [detail, setDetail] = useState({ roomId: '' });
+  const [detail, setDetail] = useState({ roomId: '', scope: 'Public', password: '' });
   const { setRoomId, setCurrentUser, setConnected } = useChatContext();
   const auth = useAuth();
   const navigate = useNavigate();
@@ -31,6 +31,10 @@ const JoinCreateChat = () => {
       toast.error('Please enter a room ID.');
       return false;
     }
+    if (detail.roomId.trim().length < 4) {
+      toast.error('Room ID must be at least 4 characters.');
+      return false;
+    }
     return true;
   };
 
@@ -43,9 +47,9 @@ const JoinCreateChat = () => {
     if (!validateForm()) return;
 
     try {
-      await joinChatApi(detail.roomId.trim());
+      const room = await joinChatApi(detail.roomId.trim(), detail.password || null);
       setCurrentUser(myInfo?.username || myInfo?.name || '');
-      setRoomId(detail.roomId.trim());
+      setRoomId(room.roomId || detail.roomId.trim());
       setConnected(true);
       toast.success('Joined room successfully.');
       navigate('/chat');
@@ -64,8 +68,17 @@ const JoinCreateChat = () => {
 
     if (!validateForm()) return;
 
+    if (detail.scope === 'Private' && !detail.password.trim()) {
+      toast.error('Private rooms need a password.');
+      return;
+    }
+
     try {
-      const response = await createRoomApi(detail.roomId.trim());
+      const response = await createRoomApi(
+        detail.roomId.trim(),
+        detail.scope,
+        detail.password.trim() || null
+      );
       setCurrentUser(myInfo?.username || myInfo?.name || '');
       setRoomId(response.roomId || detail.roomId.trim());
       setConnected(true);
@@ -109,6 +122,33 @@ const JoinCreateChat = () => {
                 className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50"
               />
             </div>
+
+            <div className="mt-4">
+              <label className="mb-2 block text-sm font-medium text-slate-300">Room Type</label>
+              <select
+                name="scope"
+                value={detail.scope}
+                onChange={handleInputChange}
+                className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50"
+              >
+                <option value="Public">Public</option>
+                <option value="Private">Private</option>
+              </select>
+            </div>
+
+            {detail.scope === 'Private' && (
+              <div className="mt-4">
+                <label className="mb-2 block text-sm font-medium text-slate-300">Password</label>
+                <input
+                  type="password"
+                  name="password"
+                  value={detail.password}
+                  onChange={handleInputChange}
+                  placeholder="Room password"
+                  className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50"
+                />
+              </div>
+            )}
 
             <div className="mt-8 flex gap-3">
               <button
