@@ -1,0 +1,20 @@
+Your text-message flow uses @SendTo("/topic/room/{roomId}") on sendMessage — that annotation works because the method is invoked through the STOMP pipeline (a client sends a SEND frame, Spring routes it to @MessageMapping, and whatever the method returns gets auto-published to the @SendTo destination). That only works for methods actually triggered by an incoming STOMP frame.
+
+Your upload endpoint isn't triggered by STOMP — it's a plain REST POST. There's no STOMP frame in play, so there's no "return value" for @SendTo to intercept. SimpMessagingTemplate is the imperative escape hatch: it's the same underlying mechanism @SendTo uses, just callable directly from anywhere in your code (a REST controller, a service, a scheduled job, wherever). convertAndSend(destination, payload) says "push this object to this broker destination right now," regardless of what triggered the call.
+
+The full path a shared file takes
+
+Frontend POSTs the file to /api/v1/chat/upload/{roomId} — a normal authenticated HTTP request, nothing WebSocket about it yet.
+ImageVideoService validates it, writes the bytes to disk under ChatAppStorage/, and saves a Message document to MongoDB — same collection your text messages live in, just with type: IMAGE/VIDEO/AUDIO and content holding the generated filename instead of message text.
+messagingTemplate.convertAndSend("/topic/room/" + roomId, saved) serializes that saved Message to JSON and hands it to the Simple Broker.
+The broker looks up its subscriber table (the same one you learned about earlier — "who's subscribed to /topic/room/room123") and pushes a MESSAGE frame down the WebSocket connection of every client currently subscribed to that room, including the uploader themselves.
+On each client, the client.subscribe(...) callback in ChatPage.jsx fires — the exact same callback that handles text messages — and the new Message object (with type: "IMAGE" etc.) gets appended to messages state.
+React re-renders, sees type !== undefined/TEXT, and renders <MediaMessage filename={message.content} type={message.type} /> instead of plain text.
+
+The part that's easy to miss: step 3 never sends the actual image bytes.
+
+The broadcast payload is just the Message document — sender, timestamp, type, and the filename as a string. It's metadata, not the file. That's deliberate: STOMP broadcasts go out to every subscribed client whether or not they're currently looking at that part of the chat, so pushing a multi-megabyte image through the broker on every send would be wasted bandwidth for anyone scrolled away or on a slow connection.
+
+So MediaMessage does its own separate step when it actually renders: it calls fetchMediaBlob(filename), which is a normal authenticated axios GET to /api/v1/chat/ret/{filename} — a completely different request path from the WebSocket broadcast, happening independently for each client, each time that message needs to be displayed. The response comes back as binary (responseType: 'blob'), and URL.createObjectURL(...) turns those bytes into a temporary local URL the browser can point an <img>/<video>/<audio> tag at.
+
+So there are really two separate delivery mechanisms working together: STOMP broadcast tells everyone "a new file exists, here's its name," and REST fetch is how each client actually pulls the bytes down, on demand, only when rendering that message. That split is the same pattern most production chat apps use (Slack, Discord, etc.) — the realtime channel carries small event/metadata payloads, and actual media is fetched over HTTP separately, often from a CDN. You've basically built a miniature version of that same architecture, which is worth mentioning if this ever comes up in an interview.

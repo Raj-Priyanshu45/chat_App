@@ -7,6 +7,7 @@ import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.roomRepo;
+import com.real_time.chat_app.enums.Content_Type;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,28 +20,19 @@ import java.time.LocalDateTime;
 public class chatService {
 
     private final roomRepo roomRepo;
-
     private final UserRepo userRepo;
-
     private final MessRepo messRepo;
 
-    public Message sendMessage(MessageRequest request , String roomId , String username){
+    public Message sendMessage(MessageRequest request, String roomId, String username) {
 
         Boolean roomFlag = roomRepo.existsByRoomId(roomId);
-
         boolean userFlag = userRepo.existsByUsername(username);
 
-        log.warn("DEBUG - incoming username from principal: [{}]", username);
-        log.warn("DEBUG - roomFlag: {}, userFlag: {}", roomFlag, userFlag);
-
-
-        if(!roomFlag){
-            log.debug("Unknown Room");
+        if (!roomFlag) {
             throw new RuntimeException("Room Not Found");
         }
 
-        if(!userFlag){
-            log.warn("UnAuthorized Attempt");
+        if (!userFlag) {
             throw new RuntimeException("UnAuthorized Attempt");
         }
 
@@ -49,6 +41,7 @@ public class chatService {
                 .content(request.message())
                 .sender(username)
                 .timeStamp(LocalDateTime.now())
+                .type(Content_Type.TEXT)
                 .build();
 
         return messRepo.save(mess);

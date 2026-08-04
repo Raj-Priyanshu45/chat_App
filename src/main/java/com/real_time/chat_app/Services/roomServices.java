@@ -1,5 +1,6 @@
 package com.real_time.chat_app.Services;
 
+import com.real_time.chat_app.DTOs.joinRoom;
 import com.real_time.chat_app.DTOs.roomId;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.Rooms;
@@ -7,12 +8,12 @@ import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.roomRepo;
+import com.real_time.chat_app.enums.ScopeVar;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -51,12 +54,17 @@ public class roomServices {
         Rooms newRoom = Rooms.builder()
                 .roomId(roomId.roomId())
                 .users(List.of(user.getUsername()))
+                .scopeVar(roomId.var())
+                .timeStamp(LocalDateTime.now())
+                .password(roomId.var() == ScopeVar.Public ? null : roomId.password())
+                .avlUser(Set.of(user.getUsername()))
+                .numberAvlUser(1)
                 .build();
 
         return repo.save(newRoom);
     }
 
-    public Rooms retRoomDetails(String roomId) {
+    public Rooms retRoomDetails(joinRoom roomInfo) {
 
         String kcId = ((Jwt) SecurityContextHolder.getContext()
                 .getAuthentication()
@@ -71,13 +79,19 @@ public class roomServices {
         if (user == null) return null;
 
         log.info("Request for join room");
-        Rooms room = repo.findByRoomId(roomId).orElse(null);
+        Rooms room = repo.findByRoomId(roomInfo.roomId()).orElse(null);
 
         if(room == null)  return null;
+
+        if(room.getScopeVar() == ScopeVar.Private){
+            if(!Objects.equals(room.getPassword() , roomInfo.password())) throw new RuntimeException("Invalid Room Id or Password");
+        }
 
         if(!room.getUsers().contains(user.getUsername())) {
 
             room.getUsers().add(user.getUsername());
+            room.getAvlUser().add(user.getUsername());
+            room.setNumberAvlUser(room.getNumberAvlUser() + 1);
             repo.save(room);
         }
 
@@ -92,7 +106,7 @@ public class roomServices {
 
         List<Message> messages = messRepo.findByRoomId(roomId);
 
-        log.info("Request for retreiving message");
+        log.info("Request for retrieving message");
 
         int start = Math.max(0 , messages.size() - (page + 1) * size);
 
@@ -105,5 +119,39 @@ public class roomServices {
 
     public List<Message> retMessSince(String roomId, LocalDateTime timestamp) {
         return messRepo.findByRoomIdAndTimeStampAfterOrderByTimeStampAsc(roomId , timestamp);
+    }
+
+    public Page<?> getSortedPage(int size , int number , String sortedBy){
+
+
+        //TODO: Implement the number of available user and set the number of count
+        String type = sortedBy.equalsIgnoreCase("timestamp") ? "timeStamp" : "numberAvlUser";
+
+        Pageable pageable = PageRequest.of(
+                number ,
+                size ,
+                Sort.by(type).descending()
+        );
+
+        return repo.findByScopeVar(ScopeVar.Public , pageable);
+    }
+
+    public void leaveRoom(String roomId , String kcId){
+
+        Rooms room = repo.findByRoomId(roomId).orElse(null);
+
+        if(room == null) return;
+
+        Users user = userRepo.findByKcId(kcId).orElse(null);
+
+        if(user == null) return;
+
+        if(!room.getAvlUser().contains(user.getUsername())) return;
+
+        room.getAvlUser().remove(user.getUsername());
+
+        room.setNumberAvlUser(room.getNumberAvlUser() - 1);
+
+        repo.save(room);
     }
 }

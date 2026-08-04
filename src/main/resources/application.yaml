@@ -5,15 +5,20 @@ spring:
   mongodb:
     uri: mongodb://root:root@localhost:27017/chatAppDB?authSource=admin
 
-
   security:
     oauth2: 
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8181/realms/chat-app
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
 server:
   port: 9000
+
 
 
 jwk-set-uri: http://localhost:8181/realms/chat-app/protocol/openid-connect/certs

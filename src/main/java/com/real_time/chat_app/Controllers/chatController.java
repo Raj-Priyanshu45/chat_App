@@ -7,6 +7,7 @@ import com.real_time.chat_app.Services.chatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
@@ -19,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Principal;
@@ -30,41 +31,26 @@ import java.security.Principal;
 public class chatController {
 
     private final chatService chatService;
-
     private final ImageVideoService fileService;
 
-
-    //@MessageMapping -> it is like post mapping of WebSocket
-                        //it is used to take the messages
-
-    //@Sendto -> it is used to redirect message to specific location
-                //sending message
-
-
-    // @PreAuthorize("hasRole('USER')")
     @MessageMapping("/sendMessages/{roomId}")
-    //for sending and receiving message
     @SendTo("/topic/room/{roomId}")
-    //for subscribe to channel
-    //used to publish message to all the topic or groups
-//    @PreAuthorize("isAuthenticated()")
     public Message sendMessage(
-            @DestinationVariable String roomId ,
-            @RequestBody MessageRequest request ,
+            @DestinationVariable String roomId,
+            @RequestBody MessageRequest request,
             Principal principal
-    ){
-
-        return chatService.sendMessage(request , roomId , principal.getName());
+    ) {
+        return chatService.sendMessage(request, roomId, principal.getName());
     }
-
 
     @MessageExceptionHandler(RuntimeException.class)
     @SendToUser("/queue/errors")
-    public String handleException(RuntimeException e){
+    public String handleException(RuntimeException e) {
         return e.getMessage();
     }
 
     @PostMapping("/upload/{roomId}")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> saveFile(
             @PathVariable String roomId,
             @RequestParam("files") MultipartFile[] files,
@@ -76,16 +62,23 @@ public class chatController {
         );
     }
 
-    @GetMapping("ret/{filename}")
-    public ResponseEntity<?> exchangePath(
+    @GetMapping("/ret/{filename}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Resource> exchangePath(
             @PathVariable String filename
-    ) throws MalformedURLException {
+    ) throws IOException {
 
-        Path path = Paths.get("/home/devxraj/Java/ChatAppStorage")
-                .resolve(filename);
+        Path path = Paths.get("/home/devxraj/Java/ChatAppStorage").resolve(filename);
+
+        if (!Files.exists(path)) {
+            return ResponseEntity.notFound().build();
+        }
 
         Resource resource = new UrlResource(path.toUri());
+        String contentType = Files.probeContentType(path);
 
-        return ResponseEntity.ok(resource);
+        return ResponseEntity.ok()
+                .contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 }
