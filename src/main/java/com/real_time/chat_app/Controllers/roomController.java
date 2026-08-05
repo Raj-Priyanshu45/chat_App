@@ -105,4 +105,15 @@ public class roomController {
 
         return ResponseEntity.status(200).build();
     }
+
+    @GetMapping("/{roomId}/members")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<List<String>> getAllMembers(
+            @PathVariable String roomId
+    ) {
+
+        return ResponseEntity.ok(
+                roomServices.getAllMembers(roomId)
+        );
+    }
 }

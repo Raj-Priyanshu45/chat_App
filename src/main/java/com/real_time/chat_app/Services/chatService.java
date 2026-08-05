@@ -75,7 +75,7 @@ public class chatService {
 
         //room id , user list , scope , pass , time , avl , number
 
-        if( !flag ){
+        if(!flag){
             room = Rooms.builder()
                     .roomId(roomId)
                     .timeStamp(LocalDateTime.now())
@@ -85,6 +85,8 @@ public class chatService {
                     .avlUser(Set.of(user1 , user2))
                     .numberAvlUser(2)
                     .build();
+
+            roomRepo.save(room);
         }else{
 
             room = roomRepo.findByRoomId(roomId).orElse(null);

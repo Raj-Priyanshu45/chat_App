@@ -87,7 +87,7 @@ public class roomServices {
             if(!Objects.equals(room.getPassword() , roomInfo.password())) throw new RuntimeException("Invalid Room Id or Password");
         }
 
-        if(!room.getUsers().contains(user.getUsername())) {
+        if(!room.getAvlUser().contains(user.getUsername())) {
 
             room.getUsers().add(user.getUsername());
             room.getAvlUser().add(user.getUsername());
@@ -153,5 +153,16 @@ public class roomServices {
         room.setNumberAvlUser(room.getNumberAvlUser() - 1);
 
         repo.save(room);
+    }
+
+    public List<String> getAllMembers(String roomId) {
+
+        Rooms room = repo.findByRoomId(roomId).orElse(null);
+
+        if (room == null) {
+            throw new RuntimeException("Room Not Found");
+        }
+
+        return room.getAvlUser().stream().toList();
     }
 }
