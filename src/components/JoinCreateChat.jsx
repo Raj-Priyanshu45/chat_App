@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
@@ -8,7 +8,7 @@ import { getMyInfo } from '../services/UserService';
 
 const JoinCreateChat = () => {
   const [detail, setDetail] = useState({ roomId: '', scope: 'Public', password: '' });
-  const { setRoomId, setCurrentUser, setConnected } = useChatContext();
+  const { setRoomId, setCurrentUser, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
   const auth = useAuth();
   const navigate = useNavigate();
   const [myInfo, setMyInfo] = useState(null);
@@ -49,6 +49,9 @@ const JoinCreateChat = () => {
     try {
       const room = await joinChatApi(detail.roomId.trim(), detail.password || null);
       setCurrentUser(myInfo?.username || myInfo?.name || '');
+      setRoomUsers(room.users || []);
+      setIsDm(false);
+      setDmTarget('');
       setRoomId(room.roomId || detail.roomId.trim());
       setConnected(true);
       toast.success('Joined room successfully.');
@@ -80,6 +83,9 @@ const JoinCreateChat = () => {
         detail.password.trim() || null
       );
       setCurrentUser(myInfo?.username || myInfo?.name || '');
+      setRoomUsers(response.users || []);
+      setIsDm(false);
+      setDmTarget('');
       setRoomId(response.roomId || detail.roomId.trim());
       setConnected(true);
       toast.success('Room created successfully.');
@@ -103,6 +109,9 @@ const JoinCreateChat = () => {
             💬
           </div>
           <h1 className="text-xl font-semibold text-white">Join Room / Create Room</h1>
+          <Link to="/discover" className="mt-2 inline-block text-sm text-cyan-400 hover:underline">
+            Browse public rooms →
+          </Link>
         </div>
 
         {auth.authenticated && myInfo === null ? (

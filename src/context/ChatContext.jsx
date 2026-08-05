@@ -6,17 +6,26 @@ export const ChatProvider = ({ children }) => {
   const [roomId, setRoomId] = useState("");
   const [connected, setConnected] = useState(false);
   const [currentUser, setCurrentUser] = useState("");
+  const [roomUsers, setRoomUsers] = useState([]);
+  const [isDm, setIsDm] = useState(false);
+  const [dmTarget, setDmTarget] = useState("");
 
   const value = useMemo(
     () => ({
       roomId,
       connected,
       currentUser,
+      roomUsers,
+      isDm,
+      dmTarget,
       setRoomId,
       setConnected,
       setCurrentUser,
+      setRoomUsers,
+      setIsDm,
+      setDmTarget,
     }),
-    [roomId, connected, currentUser]
+    [roomId, connected, currentUser, roomUsers, isDm, dmTarget]
   );
 
   return (
