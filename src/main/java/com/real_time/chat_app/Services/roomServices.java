@@ -4,7 +4,9 @@ import com.real_time.chat_app.DTOs.joinRoom;
 import com.real_time.chat_app.DTOs.roomId;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.Rooms;
+import com.real_time.chat_app.Models.UserExtras;
 import com.real_time.chat_app.Models.Users;
+import com.real_time.chat_app.Repo.ExtrasRepo;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.roomRepo;
@@ -13,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.apache.catalina.User;
 import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -32,20 +35,13 @@ public class roomServices {
     private final roomRepo repo;
     private final MessRepo messRepo;
     private final UserRepo userRepo;
+    private final ExtrasRepo extraRepo;
 
-    public Rooms createRoom(@Valid roomId roomId ) {
+    public Rooms createRoom(@Valid roomId roomId , String username) {
 
         Rooms room = repo.findByRoomId(roomId.roomId()).orElse(null);
 
-        String kcId = ((Jwt) SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getPrincipal())
-                .getSubject();
-
-        if(kcId == null || kcId.isEmpty())  return null;
-
-
-        Users user = userRepo.findByKcId(kcId).orElse(null);
+        Users user = userRepo.findByUsername(username).orElse(null);
 
         if(user == null) return null;
 
@@ -64,17 +60,9 @@ public class roomServices {
         return repo.save(newRoom);
     }
 
-    public Rooms retRoomDetails(joinRoom roomInfo) {
+    public Rooms retRoomDetails(joinRoom roomInfo , String username) {
 
-        String kcId = ((Jwt) SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getPrincipal())
-                .getSubject();
-
-        if(kcId == null || kcId.isEmpty())  return null;
-
-
-        Users user = userRepo.findByKcId(kcId).orElse(null);
+        Users user = userRepo.findByUsername(username).orElse(null);
 
         if (user == null) return null;
 
@@ -86,6 +74,22 @@ public class roomServices {
         if(room.getScopeVar() == ScopeVar.Private){
             if(!Objects.equals(room.getPassword() , roomInfo.password())) throw new RuntimeException("Invalid Room Id or Password");
         }
+
+        UserExtras extras = extraRepo.findByUsername(username).orElse(null);
+
+        if(extras == null){
+
+            extras = UserExtras.builder()
+                    .username(username)
+                    .roomId(room.getScopeVar() != ScopeVar.DM ? Set.of(roomInfo.roomId()) : Set.of())
+                    .build();
+
+
+        }else {
+            extras.getRoomId().add(roomInfo.roomId());
+        }
+
+        extraRepo.save(extras);
 
         if(!room.getAvlUser().contains(user.getUsername())) {
 

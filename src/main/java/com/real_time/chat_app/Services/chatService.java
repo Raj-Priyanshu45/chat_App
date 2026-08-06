@@ -3,7 +3,9 @@ package com.real_time.chat_app.Services;
 import com.real_time.chat_app.DTOs.MessageRequest;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.Rooms;
+import com.real_time.chat_app.Models.UserExtras;
 import com.real_time.chat_app.Models.Users;
+import com.real_time.chat_app.Repo.ExtrasRepo;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.roomRepo;
@@ -27,6 +29,7 @@ public class chatService {
     private final UserRepo userRepo;
     private final MessRepo messRepo;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ExtrasRepo extraRepo;
 
     public Message sendMessage(MessageRequest request, String roomId, String username) {
 
@@ -66,6 +69,38 @@ public class chatService {
         //String roomId , String sender , String content
 
         //TODO: get or create the room first then create mess object send and then return
+
+        UserExtras extras1 = extraRepo.findByUsername(user1).orElse(null);
+
+        if (extras1 == null) {
+            extras1 = UserExtras.builder()
+                    .username(user1)
+                    .friends(Set.of(user2))
+                    .build();
+
+        }
+        else{
+            extras1.getFriends().add(user2);
+
+        }
+
+        extraRepo.save(extras1);
+
+        UserExtras extras2 = extraRepo.findByUsername(user2).orElse(null);
+
+        if (extras2 == null) {
+            extras2 = UserExtras.builder()
+                    .username(user2)
+                    .friends(Set.of(user1))
+                    .build();
+
+
+        }
+        else{
+            extras2.getFriends().add(user1);
+        }
+
+        extraRepo.save(extras2);
 
         String roomId = getDmRoomId(user1 , user2);
 

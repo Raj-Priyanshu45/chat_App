@@ -34,9 +34,11 @@ public class roomController {
     //create rooms
     @PreAuthorize("hasRole('USER')")
     @PostMapping("/create")
-    public ResponseEntity<?> createRooms(@RequestBody @Valid roomId roomId){
+    public ResponseEntity<?> createRooms(@RequestBody @Valid roomId roomId
+                                         ,Principal principal
+    ){
 
-        Rooms room = roomServices.createRoom(roomId);
+        Rooms room = roomServices.createRoom(roomId , principal.getName());
 
         if(room == null){
             return ResponseEntity.status(409).body("Room is already there");
@@ -50,9 +52,11 @@ public class roomController {
 
     @PreAuthorize("hasRole('USER')")
     @PostMapping("/join")
-    public ResponseEntity<?> getRoom(@RequestBody joinRoom roomInfo){
+    public ResponseEntity<?> getRoom(@RequestBody joinRoom roomInfo
+                                     , Principal principal
+    ){
 
-        Rooms room = roomServices.retRoomDetails(roomInfo);
+        Rooms room = roomServices.retRoomDetails(roomInfo , principal.getName());
 
         if(room == null)
             return ResponseEntity.status(404).body("Room Not Found");

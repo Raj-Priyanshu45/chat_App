@@ -15,4 +15,5 @@ public interface roomRepo extends MongoRepository<Rooms, String> {
     Optional<Rooms> findByRoomId(String roomId);
     Boolean existsByRoomId(String roomId);
     Page<Rooms> findByScopeVar(ScopeVar scopeVar , Pageable pageable);
+    List<Rooms> findByUsersContaining(String username);
 }

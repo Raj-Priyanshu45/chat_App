@@ -25,11 +25,4 @@ public class UserController {
     ){
         return ResponseEntity.ok(userService.retAllUsers(pageNumber , size));
     }
-
-    @PreAuthorize("hasRole('USER')")
-    @GetMapping("/me")
-    public ResponseEntity<?> saveOrShowUser(){
-
-        return ResponseEntity.ok(userService.saveOrShowUser());
-    }
 }
