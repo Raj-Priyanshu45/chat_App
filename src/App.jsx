@@ -5,6 +5,7 @@ import ChatPage from './components/ChatPage';
 import DiscoverRooms from './components/DiscoverRooms';
 import { ChatProvider } from './context/ChatContext';
 import './App.css';
+import Profile from './components/Profile';
 
 console.log("App Loaded");
 
@@ -18,6 +19,7 @@ function App() {
           <Route path="/discover" element={<DiscoverRooms />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </BrowserRouter>
     </ChatProvider>

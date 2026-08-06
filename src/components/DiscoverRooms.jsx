@@ -10,18 +10,35 @@ const DiscoverRooms = () => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('');
-  const { setRoomId, setCurrentUser, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
+
+  const {
+    setRoomId,
+    setCurrentUser,
+    setConnected,
+    setRoomUsers,
+    setIsDm,
+    setDmTarget,
+  } = useChatContext();
+
   const auth = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!auth.authenticated) return;
 
-    setLoading(true);
-    getPublicRooms(20, 0, sortBy)
-      .then((page) => setRooms(page.content || []))
-      .catch(() => toast.error('Unable to load public rooms.'))
-      .finally(() => setLoading(false));
+    const loadRooms = async () => {
+      try {
+        setLoading(true);
+        const page = await getPublicRooms(20, 0, sortBy);
+        setRooms(page?.content || []);
+      } catch (error) {
+        toast.error('Unable to load public rooms.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRooms();
   }, [auth.authenticated, sortBy]);
 
   const handleJoin = async (roomId) => {
@@ -30,16 +47,20 @@ const DiscoverRooms = () => {
       const info = await getMyInfo();
 
       setCurrentUser(info?.username || info?.name || '');
-      setRoomUsers(room.users || []);
+      setRoomUsers(room?.users || []);
       setIsDm(false);
       setDmTarget('');
-      setRoomId(room.roomId);
+      setRoomId(room?.roomId);
       setConnected(true);
 
       navigate('/chat');
     } catch (error) {
-      const message = error?.response?.data || 'Unable to join room.';
-      toast.error(typeof message === 'string' ? message : 'Unable to join room.');
+      const message =
+        typeof error?.response?.data === 'string'
+          ? error.response.data
+          : 'Unable to join room.';
+
+      toast.error(message);
     }
   };
 
@@ -47,13 +68,16 @@ const DiscoverRooms = () => {
     <div className="min-h-screen bg-slate-950 px-4 py-8">
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-white">Discover public rooms</h1>
+          <h1 className="text-xl font-semibold text-white">
+            Discover Public Rooms
+          </h1>
+
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             className="rounded-full border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none"
           >
-            <option value="">Most active</option>
+            <option value="">Most Active</option>
             <option value="timestamp">Newest</option>
           </select>
         </div>
@@ -74,11 +98,16 @@ const DiscoverRooms = () => {
                 className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-4"
               >
                 <div>
-                  <p className="font-medium text-white">{room.roomId}</p>
+                  <p className="font-medium text-white">
+                    {room.roomId}
+                  </p>
+
                   <p className="text-xs text-slate-400">
-                    {room.numberAvlUser} active member{room.numberAvlUser === 1 ? '' : 's'}
+                    {room.numberAvlUser} active member
+                    {room.numberAvlUser === 1 ? '' : 's'}
                   </p>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => handleJoin(room.roomId)}

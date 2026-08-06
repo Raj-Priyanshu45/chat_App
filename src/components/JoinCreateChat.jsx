@@ -1,25 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 import { createRoomApi, joinChatApi } from '../services/RoomService';
-import { getMyInfo } from '../services/UserService';
 
 const JoinCreateChat = () => {
   const [detail, setDetail] = useState({ roomId: '', scope: 'Public', password: '' });
   const { setRoomId, setCurrentUser, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
   const auth = useAuth();
   const navigate = useNavigate();
-  const [myInfo, setMyInfo] = useState(null);
 
-  useEffect(() => {
-    if (auth.authenticated) {
-      getMyInfo().then((info) => {
-        setMyInfo(info);
-      });
-    }
-  }, [auth.authenticated]);
+  const currentUsername = auth.user?.username || auth.user?.name || '';
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -48,7 +40,7 @@ const JoinCreateChat = () => {
 
     try {
       const room = await joinChatApi(detail.roomId.trim(), detail.password || null);
-      setCurrentUser(myInfo?.username || myInfo?.name || '');
+      setCurrentUser(currentUsername);
       setRoomUsers(room.users || []);
       setIsDm(false);
       setDmTarget('');
@@ -82,7 +74,7 @@ const JoinCreateChat = () => {
         detail.scope,
         detail.password.trim() || null
       );
-      setCurrentUser(myInfo?.username || myInfo?.name || '');
+      setCurrentUser(currentUsername);
       setRoomUsers(response.users || []);
       setIsDm(false);
       setDmTarget('');
@@ -99,11 +91,7 @@ const JoinCreateChat = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
-      <div
-        className={`w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl ${
-          auth.authenticated && myInfo === null ? 'animate-pulse' : ''
-        }`}
-      >
+      <div className="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 text-5xl">
             💬
@@ -112,11 +100,16 @@ const JoinCreateChat = () => {
           <Link to="/discover" className="mt-2 inline-block text-sm text-cyan-400 hover:underline">
             Browse public rooms →
           </Link>
+          <div>
+            <Link to="/profile" className="mt-2 inline-block text-sm text-cyan-400 hover:underline">
+              View profile →
+            </Link>
+          </div>
         </div>
 
-        {auth.authenticated && myInfo === null ? (
-          <div className="flex justify-center items-center h-full">
-            <div className="w-8 h-8 border-b-2 border-cyan-400 animate-spin"></div>
+        {!auth.authInitialized ? (
+          <div className="flex justify-center items-center h-24">
+            <div className="w-8 h-8 border-b-2 border-cyan-400 animate-spin rounded-full"></div>
           </div>
         ) : (
           <>

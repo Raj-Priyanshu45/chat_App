@@ -349,6 +349,13 @@ const ChatPage = () => {
             >
               Logout
             </button>
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              className="rounded-full border border-slate-700 px-3 py-2 text-sm transition hover:bg-slate-800"
+            >
+              Profile
+            </button>
           </div>
         </div>
       </header>
