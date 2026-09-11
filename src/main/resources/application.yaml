@@ -19,6 +19,11 @@ spring:
 server:
   port: 9000
 
-
-
 jwk-set-uri: http://localhost:8181/realms/chat-app/protocol/openid-connect/certs
+
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+  api-docs:
+    path: /api-docs

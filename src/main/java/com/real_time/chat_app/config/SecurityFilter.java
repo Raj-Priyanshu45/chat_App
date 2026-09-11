@@ -31,6 +31,8 @@ public class SecurityFilter {
                 .authorizeHttpRequests(
                         auth -> auth
                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                .requestMatchers("/swagger-ui/**").permitAll()
+                                .requestMatchers("/api-docs/**").permitAll()
                                 .requestMatchers("/chat/**").permitAll()
                                 .anyRequest().authenticated()
                 )
