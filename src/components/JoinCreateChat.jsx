@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { MdArrowForward } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 import { createRoomApi, joinChatApi } from '../services/RoomService';
@@ -70,9 +71,9 @@ const JoinCreateChat = () => {
 
     try {
       const response = await createRoomApi(
-        detail.roomId.trim(),
-        detail.scope,
-        detail.password.trim() || null
+          detail.roomId.trim(),
+          detail.scope,
+          detail.password.trim() || null
       );
       setCurrentUser(currentUsername);
       setRoomUsers(response.users || []);
@@ -90,90 +91,133 @@ const JoinCreateChat = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
-      <div className="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 text-5xl">
-            💬
-          </div>
-          <h1 className="text-xl font-semibold text-white">Join Room / Create Room</h1>
-          <Link to="/discover" className="mt-2 inline-block text-sm text-cyan-400 hover:underline">
-            Browse public rooms →
-          </Link>
+      <div className="flex min-h-screen bg-ink text-cream">
+        {/* Left: brand / hero panel — hidden on small screens */}
+        <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden border-r border-border-subtle bg-surface p-12 lg:flex">
           <div>
-            <Link to="/profile" className="mt-2 inline-block text-sm text-cyan-400 hover:underline">
-              View profile →
-            </Link>
+            <span className="font-mono text-xs uppercase tracking-wider text-amber">chat_app</span>
+          </div>
+
+          <div className="max-w-md">
+            <h1 className="text-5xl font-semibold leading-[1.1] text-cream">
+              One socket.
+              <br />
+              Every room.
+            </h1>
+            <p className="mt-6 text-base leading-relaxed text-muted">
+              Rooms, direct messages, and file sharing over a single live connection —
+              STOMP over WebSocket, authenticated with Keycloak, backed by MongoDB.
+            </p>
+          </div>
+
+          <div className="space-y-2 font-mono text-xs text-muted">
+            <p>/topic/room/{'{roomId}'}</p>
+            <p>/user/queue/dm</p>
+            <p>/app/sendMessages/{'{roomId}'}</p>
           </div>
         </div>
 
-        {!auth.authInitialized ? (
-          <div className="flex justify-center items-center h-24">
-            <div className="w-8 h-8 border-b-2 border-cyan-400 animate-spin rounded-full"></div>
-          </div>
-        ) : (
-          <>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">Room ID / New Room ID</label>
-              <input
-                type="text"
-                name="roomId"
-                value={detail.roomId}
-                onChange={handleInputChange}
-                placeholder="Enter the room id"
-                className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50"
-              />
+        {/* Right: the actual form */}
+        <div className="flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-1/2 lg:px-16">
+          <div className="mx-auto w-full max-w-sm">
+            <div className="mb-10 lg:hidden">
+              <span className="font-mono text-xs uppercase tracking-wider text-amber">chat_app</span>
             </div>
 
-            <div className="mt-4">
-              <label className="mb-2 block text-sm font-medium text-slate-300">Room Type</label>
-              <select
-                name="scope"
-                value={detail.scope}
-                onChange={handleInputChange}
-                className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50"
-              >
-                <option value="Public">Public</option>
-                <option value="Private">Private</option>
-              </select>
+            <h2 className="text-2xl font-semibold text-cream">Join or create a room</h2>
+            <p className="mt-2 text-sm text-muted">Enter a room ID to jump straight in.</p>
+
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <Link to="/discover" className="text-amber hover:text-cream transition-colors">
+                Browse public rooms
+              </Link>
+              <Link to="/profile" className="text-amber hover:text-cream transition-colors">
+                View profile
+              </Link>
             </div>
 
-            {detail.scope === 'Private' && (
-              <div className="mt-4">
-                <label className="mb-2 block text-sm font-medium text-slate-300">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={detail.password}
-                  onChange={handleInputChange}
-                  placeholder="Room password"
-                  className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-3 text-slate-100 placeholder-slate-500 outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50"
-                />
-              </div>
+            {!auth.authInitialized ? (
+                <div className="mt-10 flex h-24 items-center justify-center">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-subtle border-t-amber" />
+                </div>
+            ) : (
+                <>
+                  <div className="mt-8">
+                    <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
+                      Room ID
+                    </label>
+                    <input
+                        type="text"
+                        name="roomId"
+                        value={detail.roomId}
+                        onChange={handleInputChange}
+                        placeholder="room-1234"
+                        className="w-full rounded-md border border-border-subtle bg-surface px-4 py-3 font-mono text-sm text-cream placeholder-muted/60 outline-none transition focus:border-amber"
+                    />
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
+                      Room type
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Public', 'Private'].map((option) => (
+                          <button
+                              key={option}
+                              type="button"
+                              onClick={() => setDetail((prev) => ({ ...prev, scope: option }))}
+                              className={`rounded-md border px-4 py-2.5 text-sm font-medium transition ${
+                                  detail.scope === option
+                                      ? 'border-amber bg-amber/10 text-amber'
+                                      : 'border-border-subtle bg-surface text-muted hover:text-cream'
+                              }`}
+                          >
+                            {option}
+                          </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {detail.scope === 'Private' && (
+                      <div className="mt-5">
+                        <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
+                          Password
+                        </label>
+                        <input
+                            type="password"
+                            name="password"
+                            value={detail.password}
+                            onChange={handleInputChange}
+                            placeholder="Room password"
+                            className="w-full rounded-md border border-border-subtle bg-surface px-4 py-3 text-sm text-cream placeholder-muted/60 outline-none transition focus:border-amber"
+                        />
+                      </div>
+                  )}
+
+                  <div className="mt-8 flex gap-3">
+                    <button
+                        type="button"
+                        onClick={joinChat}
+                        disabled={!auth.authenticated}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-md bg-amber px-4 py-3 text-sm font-semibold text-ink transition hover:bg-amber-dim disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Join room
+                      <MdArrowForward size={16} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={createRoom}
+                        disabled={!auth.authenticated}
+                        className="flex-1 rounded-md border border-border-subtle px-4 py-3 text-sm font-semibold text-cream transition hover:border-amber hover:text-amber disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Create room
+                    </button>
+                  </div>
+                </>
             )}
-
-            <div className="mt-8 flex gap-3">
-              <button
-                type="button"
-                onClick={joinChat}
-                className="flex-1 rounded-full bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-400"
-                disabled={!auth.authenticated}
-              >
-                Join Room
-              </button>
-              <button
-                type="button"
-                onClick={createRoom}
-                className="flex-1 rounded-full bg-orange-600 px-4 py-3 font-medium text-white transition hover:bg-orange-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-400"
-                disabled={!auth.authenticated}
-              >
-                Create Room
-              </button>
-            </div>
-          </>
-        )}
+          </div>
+        </div>
       </div>
-    </div>
   );
 };
 

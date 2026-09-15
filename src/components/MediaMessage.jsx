@@ -10,15 +10,15 @@ const MediaMessage = ({ filename, type }) => {
     let cancelled = false;
 
     fetchMediaBlob(filename)
-      .then((blobUrl) => {
-        if (cancelled) {
-          URL.revokeObjectURL(blobUrl);
-          return;
-        }
-        objectUrl = blobUrl;
-        setUrl(blobUrl);
-      })
-      .catch(() => setFailed(true));
+        .then((blobUrl) => {
+          if (cancelled) {
+            URL.revokeObjectURL(blobUrl);
+            return;
+          }
+          objectUrl = blobUrl;
+          setUrl(blobUrl);
+        })
+        .catch(() => setFailed(true));
 
     return () => {
       cancelled = true;
@@ -27,19 +27,19 @@ const MediaMessage = ({ filename, type }) => {
   }, [filename]);
 
   if (failed) {
-    return <div className="text-xs text-red-400">Unable to load media.</div>;
+    return <div className="text-xs text-rose">Unable to load media.</div>;
   }
 
   if (!url) {
-    return <div className="h-32 w-48 animate-pulse rounded-lg bg-slate-700" />;
+    return <div className="h-32 w-48 animate-pulse rounded-md bg-surface-raised" />;
   }
 
   if (type === 'IMAGE') {
-    return <img src={url} alt="Shared" className="max-w-[240px] rounded-lg" />;
+    return <img src={url} alt="Shared" className="max-w-[240px] rounded-md border border-border-subtle" />;
   }
 
   if (type === 'VIDEO') {
-    return <video src={url} controls className="max-w-[280px] rounded-lg" />;
+    return <video src={url} controls className="max-w-[280px] rounded-md border border-border-subtle" />;
   }
 
   if (type === 'AUDIO') {

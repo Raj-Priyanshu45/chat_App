@@ -21,9 +21,9 @@ const Profile = () => {
     }
 
     getMyProfile()
-      .then(setProfile)
-      .catch(() => toast.error('Unable to load profile.'))
-      .finally(() => setLoading(false));
+        .then(setProfile)
+        .catch(() => toast.error('Unable to load profile.'))
+        .finally(() => setLoading(false));
   }, [auth.authenticated, navigate]);
 
   // Same pattern DiscoverRooms/ChatPage use to jump into a DM: set context
@@ -55,112 +55,108 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-cyan-400" />
-      </div>
+        <div className="flex min-h-screen items-center justify-center bg-ink">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-subtle border-t-amber" />
+        </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
-        Unable to load profile.
-      </div>
+        <div className="flex min-h-screen items-center justify-center bg-ink text-sm text-muted">
+          Unable to load profile.
+        </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-8">
-      <div className="mx-auto max-w-2xl">
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="mb-6 flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200"
-        >
-          <MdArrowBack size={16} />
-          Back
-        </button>
+      <div className="min-h-screen bg-ink px-6 py-10 text-cream">
+        <div className="mx-auto max-w-xl">
+          <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="mb-8 flex items-center gap-1 text-sm text-muted transition hover:text-cream"
+          >
+            <MdArrowBack size={16} />
+            Back
+          </button>
 
-        {/* Header card */}
-        <div className="mb-6 flex items-center gap-4 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 text-2xl font-semibold text-white">
-            {(profile.name || profile.username || '?')[0]?.toUpperCase()}
+          {/* Header */}
+          <div className="mb-8 flex items-center gap-4 border-b border-border-subtle pb-8">
+            <div className="flex h-14 w-14 items-center justify-center rounded-md bg-surface-raised text-xl font-semibold text-amber">
+              {(profile.name || profile.username || '?')[0]?.toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold text-cream">{profile.name || profile.username}</h1>
+              <p className="font-mono text-sm text-muted">@{profile.username}</p>
+              {profile.gmail && <p className="truncate text-xs text-muted">{profile.gmail}</p>}
+            </div>
           </div>
+
+          {/* Friends */}
+          <div className="mb-8">
+            <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">Friends</h2>
+            {profile.friends.length === 0 ? (
+                <p className="text-sm text-muted">No friends yet — message someone to add them here.</p>
+            ) : (
+                <div className="overflow-hidden rounded-md border border-border-subtle">
+                  {profile.friends.map((friend, index) => (
+                      <div
+                          key={friend}
+                          className={`flex items-center justify-between px-4 py-3 ${
+                              index !== 0 ? 'border-t border-border-subtle' : ''
+                          }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-surface-raised text-sm font-semibold text-muted">
+                            {friend[0]?.toUpperCase()}
+                          </div>
+                          <span className="font-mono text-sm text-cream">{friend}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => handleMessageFriend(friend)}
+                            className="flex items-center gap-1.5 rounded-md border border-border-subtle px-3 py-1.5 text-xs text-muted transition hover:border-amber hover:text-amber"
+                        >
+                          <MdChatBubbleOutline size={14} />
+                          Message
+                        </button>
+                      </div>
+                  ))}
+                </div>
+            )}
+          </div>
+
+          {/* Room history */}
           <div>
-            <h1 className="text-xl font-semibold text-white">{profile.name || profile.username}</h1>
-            <p className="text-sm text-slate-400">@{profile.username}</p>
-            {profile.gmail && <p className="text-sm text-slate-500">{profile.gmail}</p>}
+            <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">Room history</h2>
+            {profile.roomHistory.length === 0 ? (
+                <p className="text-sm text-muted">No rooms joined yet — create or join one to see it here.</p>
+            ) : (
+                <div className="overflow-hidden rounded-md border border-border-subtle">
+                  {profile.roomHistory.map((roomId, index) => (
+                      <div
+                          key={roomId}
+                          className={`flex items-center justify-between px-4 py-3 ${
+                              index !== 0 ? 'border-t border-border-subtle' : ''
+                          }`}
+                      >
+                        <span className="font-mono text-sm text-cream">{roomId}</span>
+                        <button
+                            type="button"
+                            onClick={() => handleRejoinRoom(roomId)}
+                            className="flex items-center gap-1.5 rounded-md border border-border-subtle px-3 py-1.5 text-xs text-muted transition hover:border-amber hover:text-amber"
+                        >
+                          <MdMeetingRoom size={14} />
+                          Rejoin
+                        </button>
+                      </div>
+                  ))}
+                </div>
+            )}
           </div>
-        </div>
-
-        {/* Friends */}
-        <div className="mb-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-cyan-400">
-            Friends
-          </h2>
-          {profile.friends.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No friends yet — message someone to add them here.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {profile.friends.map((friend) => (
-                <li
-                  key={friend}
-                  className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-800/60 px-4 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-white">
-                      {friend[0]?.toUpperCase()}
-                    </div>
-                    <span className="text-sm text-slate-100">{friend}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleMessageFriend(friend)}
-                    className="flex items-center gap-1 rounded-full border border-cyan-600/50 px-3 py-1.5 text-xs text-cyan-300 transition hover:bg-cyan-600/10"
-                  >
-                    <MdChatBubbleOutline size={14} />
-                    Message
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Room history */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-cyan-400">
-            Room history
-          </h2>
-          {profile.roomHistory.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No rooms joined yet — create or join one to see it here.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {profile.roomHistory.map((roomId) => (
-                <li
-                  key={roomId}
-                  className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-800/60 px-4 py-3"
-                >
-                  <span className="text-sm text-slate-100">{roomId}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRejoinRoom(roomId)}
-                    className="flex items-center gap-1 rounded-full border border-orange-600/50 px-3 py-1.5 text-xs text-orange-300 transition hover:bg-orange-600/10"
-                  >
-                    <MdMeetingRoom size={14} />
-                    Rejoin
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       </div>
-    </div>
   );
 };
 
