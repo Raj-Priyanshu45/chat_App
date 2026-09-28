@@ -1,0 +1,60 @@
+spring:
+  application:
+    name: chat_app
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: "${gmail-username}"
+    password: "${gmail-password}"
+    properties:
+      mail:
+        smtp:
+          auth: true
+        starttls:
+          enable: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: "${Google-client-id}"
+            client-secret: "${Google-client-secret}"
+
+          github:
+            client-id: "${Github-client-id}"
+            client-secret: "${Github-client-secret}"
+
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+
+  mongodb:
+    uri: ${MONGODB_URI}
+
+server:
+  port: ${PORT:9000}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+  api-docs:
+    path: /api-docs
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+
+jwt:
+  expiration: "${expiration}"
+  secret: "${secret}"
+
+cookie:
+  secure: "${COOKIE_SECURE:false}"
+
+

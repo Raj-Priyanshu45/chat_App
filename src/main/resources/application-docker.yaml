@@ -3,13 +3,13 @@ spring:
     name: chat_app
 
   mongodb:
-    uri: mongodb://root:root@localhost:27017/chatAppDB?authSource=admin
+    uri: mongodb://root:root@mongo_db:27017/chatAppDB?authSource=admin
 
   security:
-    oauth2: 
+    oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8181/realms/chat-app
+          jwk-set-uri: http://keycloak:8080/realms/chat-app/protocol/openid-connect/certs
 
   servlet:
     multipart:
@@ -19,8 +19,6 @@ spring:
 server:
   port: 9000
 
-jwk-set-uri: http://localhost:8181/realms/chat-app/protocol/openid-connect/certs
-
 
 springdoc:
   swagger-ui:
@@ -29,4 +27,4 @@ springdoc:
     path: /api-docs
 
 storage:
-  path: /home/devxraj/Java/ChatApp/ChatAppStorage
+  path: /apps/ChatAppStorage

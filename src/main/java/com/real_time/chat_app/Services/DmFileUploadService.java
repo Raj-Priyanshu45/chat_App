@@ -1,11 +1,15 @@
 package com.real_time.chat_app.Services;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.roomRepo;
+import com.real_time.chat_app.config.CloudinaryConfig;
 import com.real_time.chat_app.enums.Content_Type;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,6 +28,11 @@ public class DmFileUploadService {
     private final MessRepo messRepo;
     private final SimpMessagingTemplate messagingTemplate;
     private final roomRepo roomRepo;
+    private final Cloudinary cloudinary;
+
+
+    @Value("${storage.path}")
+    private String uploadPath;
 
     private final static Set<String> extensions = Set.of("jpg", "jpeg", "gif", "png");
     private final static long maxImageSize = 5 * 1024 * 1024L;
@@ -103,35 +112,68 @@ public class DmFileUploadService {
         }
     }
 
-    private Message saveFile(MultipartFile file, String extension, String rec , String sender, Content_Type type) throws IOException {
+    private Message saveFile(
+            MultipartFile file,
+            String extension,
+            String rec,
+            String sender,
+            Content_Type type
+    ) throws IOException {
 
-        String newFilename = UUID.randomUUID() + "_" + UUID.randomUUID() + "." + extension;
-
-        String roomId = getDmRoomId(sender , rec);
+        String roomId = getDmRoomId(sender, rec);
 
         boolean flag = roomRepo.existsByRoomId(roomId);
 
-        if(!flag) throw new RuntimeException("Internal Server error");
+        if (!flag) {
+            throw new RuntimeException("Internal Server error");
+        }
 
-        Path uploadDir = Paths.get("/home/devxraj/Java/ChatAppStorage");
-        Files.createDirectories(uploadDir);
+        String publicId = UUID.randomUUID().toString();
 
-        Files.copy(
-                file.getInputStream(),
-                uploadDir.resolve(newFilename),
-                StandardCopyOption.REPLACE_EXISTING
+        String resourceType;
+
+        if (type == Content_Type.IMAGE) {
+            resourceType = "image";
+        } else if (type == Content_Type.VIDEO) {
+            resourceType = "video";
+        } else {
+            resourceType = "raw";
+        }
+
+        Map<String, Object> uploadParams = ObjectUtils.asMap(
+                "resource_type", resourceType,
+                "public_id", publicId,
+                "folder", "chat-app/" + type.name().toLowerCase()
         );
 
-        Message saved = messRepo.save(new Message(roomId , sender, newFilename, type));
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                file.getBytes(),
+                uploadParams
+        );
+
+        String fileUrl = (String) uploadResult.get("secure_url");
+
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new RuntimeException("Cloudinary upload failed");
+        }
+
+        Message saved = messRepo.save(
+                new Message(
+                        roomId,
+                        sender,
+                        fileUrl,
+                        type
+                )
+        );
 
         messagingTemplate.convertAndSendToUser(
-                sender ,
+                sender,
                 "/queue/dm",
                 saved
         );
 
         messagingTemplate.convertAndSendToUser(
-                rec ,
+                rec,
                 "/queue/dm",
                 saved
         );

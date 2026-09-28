@@ -20,6 +20,10 @@ public class UserExtras {
 
     private String username;
 
+    private String imageUri;
+
+    private String bio;
+
     @Builder.Default
     private Set<String> roomId = new HashSet<>();
 

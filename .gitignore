@@ -34,3 +34,6 @@ build/
 
 mongo-data:/data/db
 mongo-data
+
+.env
+application-docker.yaml.env
