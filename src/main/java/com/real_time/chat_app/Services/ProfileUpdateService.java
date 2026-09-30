@@ -46,7 +46,7 @@ public class ProfileUpdateService {
 
     public boolean updateImage(String subject, MultipartFile file) {
 
-        Users user = userRepo.findByUsername(subject).orElse(null);
+        Users user = userRepo.findById(subject).orElse(null);
 
         if (user == null) {
             log.warn("Unauthorized user changing profile");

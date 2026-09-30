@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,14 +26,11 @@ import java.util.List;
 import io.jsonwebtoken.security.Keys;
 
 @Component
+@RequiredArgsConstructor
 public class Filter extends OncePerRequestFilter {
 
-    @Value("${jwt.secret}")
-    private String secret;
 
-    private final SecretKey secretKey = Keys.hmacShaKeyFor(
-            Base64.getDecoder().decode(secret)
-    );
+    private final JwtCreation jwtCreation;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -47,12 +45,7 @@ public class Filter extends OncePerRequestFilter {
 
         try{
 
-            Claims claims = Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-
+            Claims claims = jwtCreation.parse(token);
 
             String username = claims.getSubject();
             String role = claims.get("role" , String.class);

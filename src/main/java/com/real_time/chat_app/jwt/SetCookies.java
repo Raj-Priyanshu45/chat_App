@@ -57,4 +57,28 @@ public class SetCookies {
                 access.toString()
         );
     }
+
+    public void clearTokens(HttpServletResponse response) {
+
+        ResponseCookie access = ResponseCookie
+                .from("JWT", "")
+                .httpOnly(true)
+                .secure(secure)
+                .path("/")
+                .maxAge(0)
+                .sameSite(secure ? "None" : "Lax")
+                .build();
+
+        ResponseCookie refresh = ResponseCookie
+                .from("REFRESH", "")
+                .httpOnly(true)
+                .secure(secure)
+                .path("/auth/")
+                .maxAge(0)
+                .sameSite(secure ? "None" : "Lax")
+                .build();
+
+        response.addHeader("Set-Cookie", access.toString());
+        response.addHeader("Set-Cookie", refresh.toString());
+    }
 }

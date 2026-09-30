@@ -1,8 +1,10 @@
 package com.real_time.chat_app.jwt;
 
 import com.real_time.chat_app.Models.UserAuth;
+import com.real_time.chat_app.Models.UserExtras;
 import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Repo.AuthRepo;
+import com.real_time.chat_app.Repo.ExtrasRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.enums.AccountState;
 import com.real_time.chat_app.enums.EmailVerificationState;
@@ -11,6 +13,7 @@ import com.real_time.chat_app.enums.Role;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -29,6 +32,10 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
     private final SetCookies setCookies;
     private final UserRepo userRepo;
     private final AuthRepo authRepo;
+    private final ExtrasRepo extrasRepo;
+
+    @Value("${app.frontend-url}")
+    private String frontEnd;
 
     @Override
     public void onAuthenticationSuccess(
@@ -53,7 +60,10 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
         String email = user.getAttribute("email");
 
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("Email not available from provider");
+            response.sendRedirect(
+                    frontEnd + "/login?error=email_unavailable"
+            );
+            return;
         }
 
         Users newUser = userRepo.findByGmail(email).orElse(null);
@@ -69,6 +79,12 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
                     .build();
 
             userRepo.save(newUser);
+
+            extrasRepo.save(
+                    UserExtras.builder()
+                            .userId(newUser.getId())
+                            .build()
+            );
 
             authRepo.save(
                     UserAuth.builder()
@@ -89,7 +105,7 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
             );
 
             response.sendRedirect(
-                    "http://localhost:3000/complete-profile"
+                    frontEnd + "/complete-profile"
             );
 
             return;
@@ -106,9 +122,8 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
             );
 
             response.sendRedirect(
-                    "http://localhost:3000/complete-profile"
+                    frontEnd + "/complete-profile"
             );
-
             return;
         }
 
@@ -138,7 +153,7 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
         );
 
         response.sendRedirect(
-                "http://localhost:3000/home"
+                frontEnd + "/home"
         );
     }
 

@@ -6,11 +6,11 @@ import com.real_time.chat_app.Services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -23,9 +23,9 @@ public class ProfileController {
 
     @PreAuthorize("hasRole('USER')")
     @GetMapping("/me")
-    public ResponseEntity<?> saveOrShowUser(@AuthenticationPrincipal Jwt jwt){
+    public ResponseEntity<?> saveOrShowUser(Principal principal){
 
-        Users user = userService.saveOrShowUser(jwt.getSubject());
+        Users user = userService.saveOrShowUser(principal.getName());
 
         return ResponseEntity.ok(profileService.retProfileDetails(user.getUsername()));
     }

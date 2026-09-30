@@ -3,91 +3,58 @@ package com.real_time.chat_app.config;
 import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Repo.roomRepo;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import org.jspecify.annotations.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtException;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Objects;
+import java.security.Principal;
 
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class StompAuthConfig implements ChannelInterceptor {
 
-    //provided by spring
+    private static final String TOPIC_PREFIX = "/topic/room/";
+    private static final String SEND_PREFIX = "/app/sendMessages/";
+
     private final roomRepo roomRepo;
 
-
-
-    //override preSend method
     @Override
-    public Message<?> preSend(@NonNull Message<?> message , @NonNull MessageChannel channel){
+    public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
 
-        //create the header access
         StompHeaderAccessor accessor =
-                MessageHeaderAccessor.getAccessor(message , StompHeaderAccessor.class);
+                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
+        if (accessor == null || accessor.getCommand() == null) return message;
 
-        if(accessor == null) return message;
+        StompCommand command = accessor.getCommand();
 
-        //check if the command is Connect
-        if(StompCommand.CONNECT.equals(accessor.getCommand())){
+        if (command == StompCommand.CONNECT
+                || command == StompCommand.SUBSCRIBE
+                || command == StompCommand.SEND) {
 
-            //extract the header
+            Principal user = accessor.getUser();
 
-            List<String> authHeader = accessor.getNativeHeader("Authorization");
-
-            if(authHeader == null || authHeader.isEmpty()){
-                throw new JwtException("Missing authorization header");
+            if (user == null) {
+                throw new MessageDeliveryException("Not authenticated");
             }
 
-            String token = authHeader.getFirst().substring(7);
+            if (command == StompCommand.SUBSCRIBE || command == StompCommand.SEND) {
 
-            // Jwt jwt = jwtDecoder.decode(token);
+                String roomId = roomIdFrom(accessor.getDestination());
 
-            // Authentication authentication =  jwtAuthenticationConverter.convert(jwt);
+                if (roomId != null) {
+                    Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
 
-            // accessor.setUser(authentication);
-
-
-            Jwt jwt = jwtDecoder.decode(token);
-
-            log.warn("RAW JWT CLAIMS: {}", jwt.getClaims());
-
-            Authentication authentication = jwtAuthenticationConverter.convert(jwt);
-
-            log.warn("CONVERTED PRINCIPAL NAME: {}", authentication.getName());
-
-            accessor.setUser(authentication);
-        }
-
-        if (StompCommand.SEND.equals(accessor.getCommand()) || StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-
-            String destination = accessor.getDestination();
-
-            if (destination != null &&
-                    (destination.startsWith("/app/sendMessages/") || destination.startsWith("/topic/room/"))) {
-
-                String roomId = extractRoomId(destination);
-                String userName = Objects.requireNonNull(accessor.getUser()).getName();
-
-                Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
-
-                if (room == null || !room.getAvlUser().contains(userName)) {
-                    throw new RuntimeException("Not a member of this room");
+                    // principal name = user id (set by your JWT Filter)
+                    if (room == null || !room.getAvlUser().contains(user.getName())) {
+                        throw new MessageDeliveryException("Not a member of this room");
+                    }
                 }
             }
         }
@@ -95,28 +62,10 @@ public class StompAuthConfig implements ChannelInterceptor {
         return message;
     }
 
-    private String extractRoomId(String message){
-
-        StringBuilder sb = new StringBuilder();
-        int count = 0;
-
-        for(int i = 0 ; i < message.length() ; i++){
-            if(count > 2) sb.append(message.charAt(i));
-
-            if(message.charAt(i) == '/') count++;
-        }
-
-        return sb.toString();
+    private String roomIdFrom(String destination) {
+        if (destination == null) return null;
+        if (destination.startsWith(TOPIC_PREFIX)) return destination.substring(TOPIC_PREFIX.length());
+        if (destination.startsWith(SEND_PREFIX)) return destination.substring(SEND_PREFIX.length());
+        return null;
     }
 }
-
-
-//
-//Point-by-point on what's happening:
-//
-//StompHeaderAccessor — a wrapper that lets you read STOMP-specific headers/command from the generic Spring Message object. Without this, you're just looking at a raw Message<byte[]> with no easy way to know it's STOMP at all.
-//        accessor.getCommand() — tells you which STOMP frame type this is (CONNECT, SEND, SUBSCRIBE, DISCONNECT). You gate your logic on CONNECT only — you don't want to re-validate the JWT on every single SEND, since that's wasteful and the identity is already attached to the session.
-//        accessor.getNativeHeader("Authorization") — STOMP frames carry their own header map (nativeHeaders), separate from HTTP headers. This is what your frontend STOMP client populates when you configure connectHeaders (shown below).
-//        jwtDecoder.decode(token) — this is the exact same JwtDecoder bean Spring Boot auto-configures from your issuer-uri property for the resource server. You're not writing new validation logic — you're reusing the existing signature/expiry/issuer check, just triggering it manually at a different point in the pipeline instead of automatically via a filter.
-//        accessor.setUser(authentication) — this is the important part. It attaches the authenticated principal to the STOMP session, not just this one message. Every subsequent SEND/SUBSCRIBE frame on this same connection will carry this principal automatically — accessible in your @MessageMapping methods via Principal as a method parameter, without re-checking the token.
-//Throwing an exception instead of returning null is deliberate — it causes Spring to send an ERROR frame back to the client and close the connection, which is what you want for a rejected connection (silently dropping via null would just hang the client with no feedback).

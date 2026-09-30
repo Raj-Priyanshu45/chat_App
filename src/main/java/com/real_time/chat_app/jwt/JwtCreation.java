@@ -5,6 +5,7 @@ import com.real_time.chat_app.Models.UserAuth;
 import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Repo.AuthRepo;
 import com.real_time.chat_app.enums.EmailVerificationState;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
@@ -20,6 +21,8 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 
+import static com.real_time.chat_app.enums.EmailVerificationState.Not_Verified;
+
 @Component
 @RequiredArgsConstructor
 public class JwtCreation {
@@ -33,9 +36,11 @@ public class JwtCreation {
 
     private final AuthRepo authRepo;
 
-    private final SecretKey secretKey = Keys.hmacShaKeyFor(
-            Base64.getDecoder().decode(secret)
-    );
+    private SecretKey secretKey;
+
+    @PostConstruct void init(){
+        secretKey = Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret));
+    }
 
     public String generateAccessToken(Users users){
 
@@ -43,7 +48,7 @@ public class JwtCreation {
 
         if(userAuth == null) throw new RuntimeException("Error generating Tokens");
 
-        if(userAuth.getEmailState() == EmailVerificationState.Not_Verified) expTime = 600000;
+        long exp = (userAuth.getEmailState() == Not_Verified) ? 600000 : expTime;
 
 
         return Jwts.builder()
@@ -52,7 +57,7 @@ public class JwtCreation {
                 .claim("state" , users.getState().name())
                 .claim("email_verified" , userAuth.getEmailState())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expTime))
+                .expiration(new Date(System.currentTimeMillis() + exp))
                 .signWith(secretKey)
                 .compact();
 
@@ -94,5 +99,14 @@ public class JwtCreation {
                 .signWith(secretKey)
                 .compact();
     }
+
+    public Claims parse(String token) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
 
 }

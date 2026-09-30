@@ -193,24 +193,24 @@ public class AuthService {
         return true;
     }
 
-    public void logout(HttpServletResponse response , String username){
+    public void logout(HttpServletResponse response, String userId) {
 
-        Users user = userRepo.findById(username).orElse(null);
+        Users user = userRepo.findById(userId).orElse(null);
 
-        if(user == null){
+        if (user == null) {
             throw new RuntimeException("User not found");
         }
 
         UserAuth userAuth = authRepo.findByUserId(user.getId()).orElse(null);
 
-        if(userAuth == null){
+        if (userAuth == null) {
             throw new RuntimeException("Internal error");
         }
 
         userAuth.setHashedRefreshToken(null);
         authRepo.save(userAuth);
 
-        setCookies.setTokens(response , null , null);
+        setCookies.clearTokens(response);
     }
 
     public boolean login(HttpServletResponse response , LoginFlow details) {
