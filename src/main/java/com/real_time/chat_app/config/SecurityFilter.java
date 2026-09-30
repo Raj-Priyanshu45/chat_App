@@ -37,7 +37,6 @@ public class SecurityFilter {
                 .cors(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .oauth2Login(AbstractHttpConfigurer::disable)
                 .sessionManagement(session
                         -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )

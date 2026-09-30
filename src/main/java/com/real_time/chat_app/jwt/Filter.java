@@ -61,7 +61,7 @@ public class Filter extends OncePerRequestFilter {
              List<GrantedAuthority> grantedAuthority = new ArrayList<>();
 
              grantedAuthority.add(new SimpleGrantedAuthority("ROLE_"+role));
-             grantedAuthority.add(new SimpleGrantedAuthority("STATUS_"+status));
+             grantedAuthority.add(new SimpleGrantedAuthority("STATE_"+status));
 
             Authentication authentication = new UsernamePasswordAuthenticationToken(
                     username ,
@@ -98,10 +98,16 @@ public class Filter extends OncePerRequestFilter {
     }
 
     @Override
-    protected boolean shouldNotFilter(@SuppressWarnings("null") HttpServletRequest request){
+    protected boolean shouldNotFilter(
+            HttpServletRequest request
+    ) {
 
         String path = request.getServletPath();
-        return path.startsWith("/auth");
-    }
 
+        return path.equals("/auth/register")
+                || path.equals("/auth/login")
+                || path.equals("/auth/refresh-token")
+                || path.startsWith("/oauth2/")
+                || path.startsWith("/login/oauth2/");
+    }
 }

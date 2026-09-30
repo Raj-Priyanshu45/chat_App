@@ -9,11 +9,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.coyote.Response;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
 
 
 @RestController
@@ -25,8 +26,8 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody UserRegistration userRegistration , HttpServletResponse response){
-        RegistrationState registered = authService.createUser(userRegistration , response);
+    public ResponseEntity<?> registerUser(@RequestBody UserRegistration userRegistration){
+        RegistrationState registered = authService.createUser(userRegistration );
 
         if(registered == RegistrationState.UserAlreadyRegistered){
             return ResponseEntity.status(409).body("User Already exists");
@@ -42,10 +43,10 @@ public class AuthController {
     @PostMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam(name = "key") String emailToken
                                          , HttpServletResponse response
-                                         , @AuthenticationPrincipal Jwt jwt
+                                         , Principal principal
                                          ){
 
-        boolean done = authService.verifyEmail(emailToken , response , jwt.getSubject());
+        boolean done = authService.verifyEmail(emailToken , response , principal.getName());
 
         if(done) return ResponseEntity.status(200).body("Email Verified Successfully");
 
@@ -53,16 +54,16 @@ public class AuthController {
     }
 
     @GetMapping("/send-email")
-    public ResponseEntity<?> sendToken(@AuthenticationPrincipal Jwt jwt){
-        authService.senEmail(jwt.getSubject());
+    public ResponseEntity<?> sendToken(Principal principal){
+        authService.sendEmail(principal.getName());
         return ResponseEntity.status(200).body("Token sent successfully");
     }
 
     @PostMapping("/comp-profile")
-    public ResponseEntity<?> completeProfile(@AuthenticationPrincipal Jwt jwt , HttpServletResponse response
+    public ResponseEntity<?> completeProfile(Principal principal , HttpServletResponse response
                                              , @RequestBody User_comp_profile userProfile
     ){
-        RegistrationState state = authService.completeProfile(response , jwt.getSubject() , userProfile);
+        RegistrationState state = authService.completeProfile(response , principal.getName() , userProfile);
 
         if(state == RegistrationState.Completed){
             return ResponseEntity.status(201).body("User Profile Completed");
@@ -85,8 +86,8 @@ public class AuthController {
 
 
     @GetMapping("/logout")
-    public void logout(@AuthenticationPrincipal Jwt jwt , HttpServletResponse response){
-        authService.logout(response , jwt.getSubject());
+    public void logout(Principal principal , HttpServletResponse response){
+        authService.logout(response , principal.getName());
     }
 
     @PostMapping("/login")

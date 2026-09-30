@@ -7,7 +7,6 @@ import com.real_time.chat_app.Repo.AuthRepo;
 import com.real_time.chat_app.Repo.ExtrasRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.VerificationRepo;
-import com.real_time.chat_app.config.SecurityFilter;
 import com.real_time.chat_app.enums.*;
 import com.real_time.chat_app.jwt.Filter;
 import com.real_time.chat_app.jwt.JwtCreation;
@@ -37,7 +36,11 @@ public class AuthService {
     private final mailService mailService;
     private final Filter filter;
 
-    public RegistrationState createUser(UserRegistration userRegistration , HttpServletResponse response) {
+    public RegistrationState createUser(UserRegistration userRegistration ) {
+
+        if(userRepo.existsByGmail(userRegistration.gmail())){
+            return RegistrationState.UserAlreadyRegistered;
+        }
 
         String hashedPassword = passwordEncoder.encode(userRegistration.password());
 
@@ -74,7 +77,7 @@ public class AuthService {
 
     public boolean verifyEmail(String emailToken, HttpServletResponse response, String subject) {
 
-        VerificationTokenFlow token = tokenRepo.findByUsername(subject).orElse(null);
+        VerificationTokenFlow token = tokenRepo.findByUserId(subject).orElse(null);
 
         if(token == null){
             log.warn("Invalid request from user {}",subject);
@@ -82,9 +85,9 @@ public class AuthService {
         }
 
         if(emailToken.equals(token.getToken())
-                && token.getExpirationTime().isBefore(LocalDateTime.now())){
+                && token.getExpirationTime().isAfter(LocalDateTime.now())){
 
-            Users users = userRepo.findByUsername(subject).orElse(null);
+            Users users = userRepo.findById(subject).orElse(null);
 
             if(users == null) throw  new RuntimeException("Internal Issue");
 
@@ -112,8 +115,8 @@ public class AuthService {
         return false;
     }
 
-    public void senEmail(String username){
-        Users users = userRepo.findByUsername(username).orElse(null);
+    public void sendEmail(String username){
+        Users users = userRepo.findById(username).orElse(null);
 
         if(users == null) throw  new RuntimeException("User not found");
 
@@ -125,7 +128,7 @@ public class AuthService {
 
     public RegistrationState completeProfile(HttpServletResponse response, String subject, User_comp_profile userProfile) {
 
-        Users users = userRepo.findByUsername(subject).orElse(null);
+        Users users = userRepo.findById(subject).orElse(null);
 
         if(users == null){
             log.warn("Unauthorized attempt");
@@ -142,6 +145,7 @@ public class AuthService {
 
         users.setName(userProfile.name());
         users.setUsername(userProfile.username());
+        users.setState(AccountState.ACTIVE);
         userRepo.save(users);
 
         String accessToken = jwtCreation.generateAccessToken(users);
@@ -174,12 +178,15 @@ public class AuthService {
             return false;
         }
 
-        Users user = userRepo.findById(userAuth.getId()).orElse(null);
+        Users user = userRepo.findById(userAuth.getUserId()).orElse(null);
         if(user == null) throw new RuntimeException("Internal server error");
 
         String accessToken = jwtCreation.generateAccessToken(user);
         String refreshToken = jwtCreation.rawRefreshToken();
         String hashToken = jwtCreation.hashRefreshToken(refreshToken);
+
+        userAuth.setHashedRefreshToken(hashToken);
+        authRepo.save(userAuth);
 
         setCookies.setTokens(response , accessToken , refreshToken);
 
@@ -188,7 +195,7 @@ public class AuthService {
 
     public void logout(HttpServletResponse response , String username){
 
-        Users user = userRepo.findByUsername(username).orElse(null);
+        Users user = userRepo.findById(username).orElse(null);
 
         if(user == null){
             throw new RuntimeException("User not found");
@@ -219,6 +226,9 @@ public class AuthService {
 
         if(userAuth == null) return false;
 
+        if (userAuth.getEmailState() != EmailVerificationState.Verified) {
+            return false;
+        }
 
         if (!passwordEncoder.matches(
                 details.password(),

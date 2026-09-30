@@ -38,4 +38,23 @@ public class SetCookies {
         response.addHeader("Set-Cookie", access.toString());
         response.addHeader("Set-Cookie", refresh.toString());
     }
+
+    public void setAccessToken(
+            HttpServletResponse response,
+            String accessToken
+    ) {
+        ResponseCookie access = ResponseCookie
+                .from("JWT", accessToken)
+                .httpOnly(true)
+                .secure(secure)
+                .path("/")
+                .maxAge(Duration.ofMinutes(10))
+                .sameSite("Lax")
+                .build();
+
+        response.addHeader(
+                "Set-Cookie",
+                access.toString()
+        );
+    }
 }

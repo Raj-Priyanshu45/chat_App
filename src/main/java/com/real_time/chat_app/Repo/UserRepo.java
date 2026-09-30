@@ -19,4 +19,6 @@ public interface UserRepo extends MongoRepository<Users , String> {
 
     Optional<Users> findByGmail(String gmail);
 
+    boolean existsByGmail(String gmail);
+
 }

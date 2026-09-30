@@ -7,6 +7,7 @@ import com.real_time.chat_app.Repo.AuthRepo;
 import com.real_time.chat_app.enums.EmailVerificationState;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 public class JwtCreation {
+
 
     @Value("${jwt.secret}")
     private String secret;
@@ -43,8 +45,9 @@ public class JwtCreation {
 
         if(userAuth.getEmailState() == EmailVerificationState.Not_Verified) expTime = 600000;
 
+
         return Jwts.builder()
-                .subject(users.getUsername())
+                .subject(users.getId())
                 .claim("role" , users.getRole().name())
                 .claim("state" , users.getState().name())
                 .claim("email_verified" , userAuth.getEmailState())
@@ -73,4 +76,23 @@ public class JwtCreation {
             throw new RuntimeException(e);
         }
     }
+
+    public String generateIncompleteToken(Users users) {
+
+        return Jwts.builder()
+                .subject(users.getId())
+                .claim("role", users.getRole().name())
+                .claim("state", users.getState().name())
+                .claim("onboarding", true)
+                .issuedAt(new Date())
+                .expiration(
+                        new Date(
+                                System.currentTimeMillis()
+                                        + 10 * 60 * 1000L
+                        )
+                )
+                .signWith(secretKey)
+                .compact();
+    }
+
 }

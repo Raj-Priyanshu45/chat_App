@@ -8,5 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface VerificationRepo extends MongoRepository<VerificationTokenFlow, String> {
-    Optional<VerificationTokenFlow> findByUsername(String subject);
+    Optional<VerificationTokenFlow> findByUserId(String id);
 }
