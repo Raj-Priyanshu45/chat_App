@@ -1,4 +1,9 @@
 spring:
+
+  data:
+    mongodb:
+      auto-index-creation: true
+
   application:
     name: chat_app
 

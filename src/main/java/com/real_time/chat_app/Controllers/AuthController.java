@@ -39,16 +39,22 @@ public class AuthController {
 
 
     @PostMapping("/verify-email")
-    public ResponseEntity<?> verifyEmail(@RequestParam(name = "key") String emailToken
-                                         , HttpServletResponse response
-                                         , Principal principal
-                                         ){
+    public ResponseEntity<?> verifyEmail(
+            @RequestParam(name = "key") String emailToken,
+            HttpServletResponse response
+    ) {
 
-        boolean done = authService.verifyEmail(emailToken , response , principal.getName());
+        boolean done =
+                authService.verifyEmail(
+                        emailToken,
+                        response
+                );
 
-        if(done) return ResponseEntity.status(200).body("Email Verified Successfully");
+        if (done) {
+            return ResponseEntity.ok("Email Verified Successfully");
+        }
 
-        return ResponseEntity.status(401).body("Invalid Token!! Try again");
+        return ResponseEntity.status(401).body("Invalid or expired verification token");
     }
 
     @GetMapping("/send-email")

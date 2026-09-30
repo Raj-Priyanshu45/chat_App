@@ -36,13 +36,18 @@ public class AuthService {
     private final mailService mailService;
     private final Filter filter;
 
-    public RegistrationState createUser(UserRegistration userRegistration ) {
+    public RegistrationState createUser(UserRegistration userRegistration) {
 
-        if(userRepo.existsByGmail(userRegistration.gmail())){
+        if (userRepo.existsByGmail(userRegistration.gmail())) {
             return RegistrationState.UserAlreadyRegistered;
         }
 
-        String hashedPassword = passwordEncoder.encode(userRegistration.password());
+        if (userRepo.existsByUsername(userRegistration.username())) {
+            return RegistrationState.UserName_Already_Taken;
+        }
+
+        String hashedPassword =
+                passwordEncoder.encode(userRegistration.password());
 
         Users user = Users.builder()
                 .username(userRegistration.username())
@@ -70,60 +75,124 @@ public class AuthService {
                         .build()
         );
 
+        String token = UUID.randomUUID().toString();
 
-        log.info("User created with {} and {}" , userRegistration.username() , userRegistration.gmail());
+        tokenRepo.deleteByUserId(user.getId());
+
+        tokenRepo.save(
+                VerificationTokenFlow.builder()
+                        .userId(user.getId())
+                        .email(user.getGmail())
+                        .token(token)
+                        .expirationTime(
+                                LocalDateTime.now().plusMinutes(15)
+                        )
+                        .build()
+        );
+
+        mailService.sendVerificationEmail(
+                user.getGmail(),
+                token
+        );
+
+        log.info(
+                "User created with {} and {}",
+                userRegistration.username(),
+                userRegistration.gmail()
+        );
+
         return RegistrationState.Completed;
     }
 
-    public boolean verifyEmail(String emailToken, HttpServletResponse response, String subject) {
+    public boolean verifyEmail(
+            String emailToken,
+            HttpServletResponse response
+    ) {
 
-        VerificationTokenFlow token = tokenRepo.findByUserId(subject).orElse(null);
+        VerificationTokenFlow token =
+                tokenRepo.findByToken(emailToken).orElse(null);
 
-        if(token == null){
-            log.warn("Invalid request from user {}",subject);
-            throw new RuntimeException("token not assigned");
+        if (token == null) {
+            return false;
         }
 
-        if(emailToken.equals(token.getToken())
-                && token.getExpirationTime().isAfter(LocalDateTime.now())){
-
-            Users users = userRepo.findById(subject).orElse(null);
-
-            if(users == null) throw  new RuntimeException("Internal Issue");
-
-            UserAuth userAuth = authRepo.findByUserId(users.getId()).orElse(null);
-
-            if(userAuth == null) throw new RuntimeException("Internal Issue");
-
-            userAuth.setEmailState(EmailVerificationState.Verified);
-
-
-            String refreshToken = jwtCreation.rawRefreshToken();
-
-            String hashRefreshToken = jwtCreation.hashRefreshToken(refreshToken);
-
-            userAuth.setHashedRefreshToken(hashRefreshToken);
-            authRepo.save(userAuth);
-
-            String accessToken = jwtCreation.generateAccessToken(users);
-
-            setCookies.setTokens(response , accessToken , refreshToken);
-
-            return true;
+        if (!token.getExpirationTime()
+                .isAfter(LocalDateTime.now())) {
+            return false;
         }
 
-        return false;
+        Users users =
+                userRepo.findById(token.getUserId()).orElse(null);
+
+        if (users == null) {
+            throw new RuntimeException("Internal Issue");
+        }
+
+        UserAuth userAuth =
+                authRepo.findByUserId(users.getId()).orElse(null);
+
+        if (userAuth == null) {
+            throw new RuntimeException("Internal Issue");
+        }
+
+        userAuth.setEmailState(
+                EmailVerificationState.Verified
+        );
+
+        String refreshToken =
+                jwtCreation.rawRefreshToken();
+
+        String hashRefreshToken =
+                jwtCreation.hashRefreshToken(refreshToken);
+
+        userAuth.setHashedRefreshToken(hashRefreshToken);
+
+        authRepo.save(userAuth);
+
+        String accessToken =
+                jwtCreation.generateAccessToken(users);
+
+        setCookies.setTokens(
+                response,
+                accessToken,
+                refreshToken
+        );
+
+        tokenRepo.delete(token);
+
+        return true;
     }
 
-    public void sendEmail(String username){
-        Users users = userRepo.findById(username).orElse(null);
+    public void sendEmail(String userId) {
 
-        if(users == null) throw  new RuntimeException("User not found");
+        Users users =
+                userRepo.findById(userId).orElse(null);
 
-        String email = users.getGmail();
+        if (users == null) {
+            throw new RuntimeException("User not found");
+        }
 
-        mailService.sendVerificationEmail(email , UUID.randomUUID().toString());
+        String token =
+                UUID.randomUUID().toString();
 
+        tokenRepo.deleteByUserId(userId);
+
+        VerificationTokenFlow tokenFlow =
+                VerificationTokenFlow.builder()
+                        .userId(userId)
+                        .email(users.getGmail())
+                        .token(token)
+                        .expirationTime(
+                                LocalDateTime.now().plusMinutes(15)
+                        )
+                        .build();
+
+        tokenRepo.save(tokenFlow);
+
+        mailService.sendVerificationEmail(
+                users.getGmail(),
+                token
+        );
     }
 
     public RegistrationState completeProfile(HttpServletResponse response, String subject, User_comp_profile userProfile) {
@@ -227,6 +296,10 @@ public class AuthService {
         if(userAuth == null) return false;
 
         if (userAuth.getEmailState() != EmailVerificationState.Verified) {
+            return false;
+        }
+
+        if (userAuth.getPassword() == null) {
             return false;
         }
 
