@@ -10,39 +10,43 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: "${gmail-username}"
-    password: "${gmail-password}"
+    username: "${GMAIL_USERNAME:}"
+    password: "${GMAIL_PASSWORD:}"
     properties:
       mail:
         smtp:
           auth: true
-        starttls:
-          enable: true
+          starttls:
+            enable: true
 
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: "${Google-client-id}"
-            client-secret: "${Google-client-secret}"
+            client-id: "${GOOGLE_CLIENT_ID:not-set}"
+            client-secret: "${GOOGLE_CLIENT_SECRET:not-set}"
 
           github:
-            client-id: "${Github-client-id}"
-            client-secret: "${Github-client-secret}"
-
+            client-id: "${GITHUB_CLIENT_ID:not-set}"
+            client-secret: "${GITHUB_CLIENT_SECRET:not-set}"
+            scope:
+              - read:user
+              - user:email
 
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
 
-
   mongodb:
-    uri: ${MONGODB_URI}
+    uri: "${MONGODB_URI:mongodb://root:root@localhost:27017/chatAppDB?authSource=admin}"
+
 
 server:
   port: ${PORT:9000}
+  forward-headers-strategy: framework
+
 
 springdoc:
   swagger-ui:
@@ -50,18 +54,21 @@ springdoc:
   api-docs:
     path: /api-docs
 
+
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
-  api-secret: ${CLOUDINARY_API_SECRET}
+  cloud-name: "${CLOUDINARY_CLOUD_NAME:not-set}"
+  api-key: "${CLOUDINARY_API_KEY:not-set}"
+  api-secret: "${CLOUDINARY_API_SECRET:not-set}"
+
 
 jwt:
-  expiration: "${expiration}"
-  secret: "${secret}"
+  expiration: "${EXPIRATION:900000}"
+  secret: "${SECRET:VGhpcy1pcy1hLWRldi1zZWNyZXQta2V5LWZvci1qbGluZy0yMDI2LXNvbWUtcmFuZG9tLWJhc2U2NA==}"
+
 
 cookie:
   secure: "${COOKIE_SECURE:false}"
 
 
 app:
-  frontend-url: "${frontend:http://localhost:3000}"
+  frontend-url: "${FRONTEND:http://localhost:3000}"
