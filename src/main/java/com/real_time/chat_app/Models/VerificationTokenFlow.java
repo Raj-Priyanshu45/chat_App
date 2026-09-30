@@ -25,5 +25,5 @@ public class VerificationTokenFlow {
 
     private LocalDateTime expirationTime;
 
-
+    private String username;
 }

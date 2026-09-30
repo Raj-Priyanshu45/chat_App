@@ -1,9 +1,13 @@
 package com.real_time.chat_app.jwt;
 
 import com.real_time.chat_app.Models.Message;
+import com.real_time.chat_app.Models.UserAuth;
 import com.real_time.chat_app.Models.Users;
+import com.real_time.chat_app.Repo.AuthRepo;
+import com.real_time.chat_app.enums.EmailVerificationState;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +20,7 @@ import java.util.Date;
 import java.util.UUID;
 
 @Component
+@RequiredArgsConstructor
 public class JwtCreation {
 
     @Value("${jwt.secret}")
@@ -24,16 +29,25 @@ public class JwtCreation {
     @Value("${jwt.expiration}")
     private long expTime;
 
+    private final AuthRepo authRepo;
+
     private final SecretKey secretKey = Keys.hmacShaKeyFor(
             Base64.getDecoder().decode(secret)
     );
 
     public String generateAccessToken(Users users){
 
+        UserAuth userAuth = authRepo.findByUserId(users.getId()).orElse(null);
+
+        if(userAuth == null) throw new RuntimeException("Error generating Tokens");
+
+        if(userAuth.getEmailState() == EmailVerificationState.Not_Verified) expTime = 600000;
+
         return Jwts.builder()
                 .subject(users.getUsername())
                 .claim("role" , users.getRole().name())
                 .claim("state" , users.getState().name())
+                .claim("email_verified" , userAuth.getEmailState())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expTime))
                 .signWith(secretKey)

@@ -5,6 +5,7 @@ import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Repo.AuthRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.enums.AccountState;
+import com.real_time.chat_app.enums.EmailVerificationState;
 import com.real_time.chat_app.enums.Provider;
 import com.real_time.chat_app.enums.Role;
 import io.jsonwebtoken.Jwt;
@@ -14,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 
 
 import java.io.IOException;
@@ -63,6 +63,7 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
                             .createdAt(LocalDateTime.now())
                             .provider(provider.equals("GOOGLE") ? Provider.Google : Provider.Github)
                             .password(null)
+                            .emailState(EmailVerificationState.Verified)
                             .userId(newUser.getId())
                             .build()
             );

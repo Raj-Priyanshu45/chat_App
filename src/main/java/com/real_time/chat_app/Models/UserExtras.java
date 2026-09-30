@@ -18,7 +18,7 @@ public class UserExtras {
     @Id
     private String id;
 
-    private String username;
+    private String userId;
 
     private String imageUri;
 

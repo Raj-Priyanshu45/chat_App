@@ -3,10 +3,8 @@ package com.real_time.chat_app.Services;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.real_time.chat_app.Models.Message;
-import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.roomRepo;
-import com.real_time.chat_app.config.CloudinaryConfig;
 import com.real_time.chat_app.enums.Content_Type;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,10 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 @Service
@@ -29,10 +23,6 @@ public class DmFileUploadService {
     private final SimpMessagingTemplate messagingTemplate;
     private final roomRepo roomRepo;
     private final Cloudinary cloudinary;
-
-
-    @Value("${storage.path}")
-    private String uploadPath;
 
     private final static Set<String> extensions = Set.of("jpg", "jpeg", "gif", "png");
     private final static long maxImageSize = 5 * 1024 * 1024L;
@@ -66,10 +56,10 @@ public class DmFileUploadService {
 
         List<Message> saved = new ArrayList<>();
 
-
         for (MultipartFile file : files) {
             saved.add(checkAndUpload(file, sender, rec));
         }
+
         return saved;
     }
 
@@ -201,8 +191,7 @@ public class DmFileUploadService {
         return sb.reverse().toString().toLowerCase();
     }
 
-
-    private String getDmRoomId(String sender , String rec){
+    private String getDmRoomId(String sender, String rec) {
         return sender.compareTo(rec) < 0 ? sender + rec : rec + sender;
     }
 }

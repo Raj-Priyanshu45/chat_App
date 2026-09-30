@@ -88,24 +88,24 @@ public class chatController {
         );
     }
 
-    @GetMapping("/ret/{filename}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<Resource> exchangePath(
-            @PathVariable String filename
-    ) throws IOException {
-
-        Path path = Paths.get("/home/devxraj/Java/ChatAppStorage").resolve(filename);
-
-        if (!Files.exists(path)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Resource resource = new UrlResource(path.toUri());
-        String contentType = Files.probeContentType(path);
-
-        return ResponseEntity.ok()
-                .contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
-    }
+//    @GetMapping("/ret/{filename}")
+//    @PreAuthorize("hasRole('USER')")
+//    public ResponseEntity<Resource> exchangePath(
+//            @PathVariable String filename
+//    ) throws IOException {
+//
+//        Path path = Paths.get("/home/devxraj/Java/ChatAppStorage").resolve(filename);
+//
+//        if (!Files.exists(path)) {
+//            return ResponseEntity.notFound().build();
+//        }
+//
+//        Resource resource = new UrlResource(path.toUri());
+//        String contentType = Files.probeContentType(path);
+//
+//        return ResponseEntity.ok()
+//                .contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
+//                .body(resource);
+//    }
 
 }

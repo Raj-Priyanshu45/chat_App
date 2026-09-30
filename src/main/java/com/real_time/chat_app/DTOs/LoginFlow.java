@@ -1,9 +1,7 @@
 package com.real_time.chat_app.DTOs;
 
-public record UserRegistration(
-        String name ,
+public record LoginFlow(
         String username ,
-        String gmail ,
         String password
 ) {
 }

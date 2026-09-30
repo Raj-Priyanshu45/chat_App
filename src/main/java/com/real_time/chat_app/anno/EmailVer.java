@@ -1,4 +1,12 @@
 package com.real_time.chat_app.anno;
 
-public interface EmailVer {
+import org.springframework.security.access.prepost.PreAuthorize;
+
+import java.lang.annotation.*;
+
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@PreAuthorize("hasAuthority('STATE_Verified')")
+public @interface EmailVer {
 }

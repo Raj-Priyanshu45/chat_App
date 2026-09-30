@@ -1,5 +1,6 @@
 package com.real_time.chat_app.Models;
 
+import com.real_time.chat_app.enums.EmailVerificationState;
 import com.real_time.chat_app.enums.Provider;
 import lombok.*;
 import org.springframework.data.annotation.Id;
@@ -27,4 +28,6 @@ public class UserAuth {
     private Provider provider;
 
     private String hashedRefreshToken;
+
+    private EmailVerificationState emailState;
 }

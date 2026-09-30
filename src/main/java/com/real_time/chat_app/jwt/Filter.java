@@ -18,7 +18,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import javax.crypto.SecretKey;
 import java.io.IOException;
-import java.security.Security;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -43,6 +42,7 @@ public class Filter extends OncePerRequestFilter {
 
         if(token == null){
             filterChain.doFilter(request , response);
+            return;
         }
 
         try{
@@ -56,16 +56,17 @@ public class Filter extends OncePerRequestFilter {
 
             String username = claims.getSubject();
             String role = claims.get("role" , String.class);
+            String status = claims.get("state" , String.class);
 
              List<GrantedAuthority> grantedAuthority = new ArrayList<>();
 
              grantedAuthority.add(new SimpleGrantedAuthority("ROLE_"+role));
-             grantedAuthority.add(new SimpleGrantedAuthority("STATUS_"+role));
+             grantedAuthority.add(new SimpleGrantedAuthority("STATUS_"+status));
 
             Authentication authentication = new UsernamePasswordAuthenticationToken(
                     username ,
                     null ,
-                    List.of(grantedAuthority)
+                    grantedAuthority
             );
 
             SecurityContextHolder.getContext()
@@ -74,6 +75,7 @@ public class Filter extends OncePerRequestFilter {
 
         catch (Exception e){
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired JWT");
+            return;
         }
 
         filterChain.doFilter(request , response);

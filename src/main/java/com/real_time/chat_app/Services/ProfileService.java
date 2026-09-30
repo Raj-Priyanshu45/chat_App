@@ -20,34 +20,37 @@ public class ProfileService {
     private final ExtrasRepo extraRepo;
     private final UserRepo userRepo;
 
-    public ProfileResponse retProfileDetails(String username){
+    public ProfileResponse retProfileDetails(String userId) {
 
-        Users user = userRepo.findByUsername(username).orElse(null);
+        Users user = userRepo.findById(userId).orElse(null);
 
-        if(user == null){
+        if (user == null) {
             throw new RuntimeException("Invalid User");
         }
 
-        UserExtras userExtras = extraRepo.findByUsername(username).orElse(null);
+        UserExtras userExtras = extraRepo.findByUserId(user.getId()).orElse(null);
 
-        if(userExtras != null){
+        if (userExtras != null) {
 
             List<String> friends = userExtras.getFriends().stream().toList();
 
             List<String> historyOfRooms = userExtras.getRoomId().stream().toList();
 
-            return new ProfileResponse(user.getKcId() ,
-                    user.getUsername() ,
-                    user.getName() ,
-                    user.getGmail() ,
-                    friends ,
+            return new ProfileResponse(
+                    user.getUsername(),
+                    user.getName(),
+                    user.getGmail(),
+                    friends,
                     historyOfRooms
-                    );
+            );
         }
 
-        return new ProfileResponse(user.getKcId() ,
-                user.getUsername() ,
-                user.getName() ,
-                user.getGmail() , Collections.emptyList() , Collections.emptyList());
+        return new ProfileResponse(
+                user.getUsername(),
+                user.getName(),
+                user.getGmail(),
+                Collections.emptyList(),
+                Collections.emptyList()
+        );
     }
 }

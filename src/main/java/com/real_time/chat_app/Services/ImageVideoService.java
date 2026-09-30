@@ -24,7 +24,6 @@ public class ImageVideoService {
     private final roomRepo roomRepo;
     private final Cloudinary cloudinary;
 
-
     private static final Set<String> extensions =
             Set.of("jpg", "jpeg", "gif", "png", "webp", "bmp");
 
@@ -39,7 +38,6 @@ public class ImageVideoService {
                     "image/webp",
                     "image/bmp"
             );
-
 
     private static final Set<String> videoExtensions =
             Set.of(
@@ -68,7 +66,6 @@ public class ImageVideoService {
                     "video/x-m4v"
             );
 
-
     private static final long maxAudioSize =
             10 * 1024 * 1024L;
 
@@ -93,7 +90,6 @@ public class ImageVideoService {
                     "audio/opus",
                     "audio/amr"
             );
-
 
     public List<Message> uploadFiles(
             MultipartFile[] files,
@@ -123,7 +119,6 @@ public class ImageVideoService {
 
         return saved;
     }
-
 
     private Message checkAndUpload(
             MultipartFile file,
@@ -157,8 +152,6 @@ public class ImageVideoService {
         long size =
                 file.getSize();
 
-
-        // IMAGE
         if (MIME_TYPES.contains(contentType)) {
 
             if (!extensions.contains(extension)) {
@@ -182,8 +175,6 @@ public class ImageVideoService {
             );
         }
 
-
-        // VIDEO
         else if (VIDEO_TYPES.contains(contentType)) {
 
             if (!videoExtensions.contains(extension)) {
@@ -207,8 +198,6 @@ public class ImageVideoService {
             );
         }
 
-
-        // AUDIO
         else if (AUDIO_TYPES.contains(contentType)) {
 
             if (!AUDIO_EXTENSIONS.contains(extension)) {
@@ -232,14 +221,12 @@ public class ImageVideoService {
             );
         }
 
-
         else {
             throw new RuntimeException(
                     "Invalid Content type"
             );
         }
     }
-
 
     private Message saveFile(
             MultipartFile file,
@@ -249,52 +236,30 @@ public class ImageVideoService {
             Content_Type type
     ) throws IOException {
 
-        /*
-         * Generate a unique Cloudinary public ID.
-         */
         String publicId =
                 UUID.randomUUID().toString();
 
-
-        /*
-         * Decide Cloudinary resource type.
-         */
         String resourceType;
 
         if (type == Content_Type.IMAGE) {
-
             resourceType = "image";
-
         } else if (type == Content_Type.VIDEO) {
-
             resourceType = "video";
-
         } else {
-
             resourceType = "raw";
         }
 
-
-        /*
-         * Cloudinary upload parameters.
-         */
         Map<String, Object> uploadParams =
                 ObjectUtils.asMap(
                         "resource_type",
                         resourceType,
-
                         "folder",
                         "chat-app/" +
                                 type.name().toLowerCase(),
-
                         "public_id",
                         publicId
                 );
 
-
-        /*
-         * Upload to Cloudinary.
-         */
         Map<?, ?> uploadResult =
                 cloudinary
                         .uploader()
@@ -303,15 +268,10 @@ public class ImageVideoService {
                                 uploadParams
                         );
 
-
-        /*
-         * Get HTTPS URL returned by Cloudinary.
-         */
         String fileUrl =
                 (String) uploadResult.get(
                         "secure_url"
                 );
-
 
         if (fileUrl == null ||
                 fileUrl.isBlank()) {
@@ -321,10 +281,6 @@ public class ImageVideoService {
             );
         }
 
-
-        /*
-         * Store Cloudinary URL in MongoDB.
-         */
         Message saved =
                 messRepo.save(
                         new Message(
@@ -335,22 +291,16 @@ public class ImageVideoService {
                         )
                 );
 
-
-        /*
-         * Broadcast message to room.
-         */
         messagingTemplate.convertAndSend(
                 "/topic/room/" +
                         room.getRoomId(),
                 saved
         );
 
-
         return saved;
     }
 
-
-    private String getExtensions(
+    public String getExtensions(
             String filename
     ) {
 
@@ -366,7 +316,6 @@ public class ImageVideoService {
         ) {
 
             if (filename.charAt(i) == '.') {
-
                 flag = true;
                 break;
             }

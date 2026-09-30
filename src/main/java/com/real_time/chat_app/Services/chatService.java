@@ -31,10 +31,10 @@ public class chatService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ExtrasRepo extraRepo;
 
-    public Message sendMessage(MessageRequest request, String roomId, String username) {
+    public Message sendMessage(MessageRequest request, String roomId, String userId) {
 
         Boolean roomFlag = roomRepo.existsByRoomId(roomId);
-        boolean userFlag = userRepo.existsByUsername(username);
+        boolean userFlag = userRepo.existsById(userId);
 
         if (!roomFlag) {
             throw new RuntimeException("Room Not Found");
@@ -47,7 +47,7 @@ public class chatService {
         Message mess = Message.builder()
                 .roomId(roomId)
                 .content(request.message())
-                .sender(username)
+                .sender(userId)
                 .timeStamp(LocalDateTime.now())
                 .type(Content_Type.TEXT)
                 .build();
@@ -57,88 +57,78 @@ public class chatService {
 
     public Message sendDm(String user1, MessageRequest request, String user2) {
 
+        Users user = userRepo.findById(user1).orElse(null);
 
-        //user1 - jisko send krna hai
-        //user2 - jo send kr rha hai
+        Users nextUser = userRepo.findById(user2).orElse(null);
 
+        if (user == null || nextUser == null) {
+            throw new RuntimeException("Invalid UserId");
+        }
 
-        Users user = userRepo.findByUsername(user1).orElse(null);
-
-        if(user == null) throw new RuntimeException("Invalid Username");
-
-        //String roomId , String sender , String content
-
-        //TODO: get or create the room first then create mess object send and then return
-
-        UserExtras extras1 = extraRepo.findByUsername(user1).orElse(null);
+        UserExtras extras1 = extraRepo.findByUserId(user.getId()).orElse(null);
 
         if (extras1 == null) {
             extras1 = UserExtras.builder()
-                    .username(user1)
+                    .userId(user.getId())
                     .friends(Set.of(user2))
                     .build();
 
-        }
-        else{
+        } else {
             extras1.getFriends().add(user2);
-
         }
 
         extraRepo.save(extras1);
 
-        UserExtras extras2 = extraRepo.findByUsername(user2).orElse(null);
+        UserExtras extras2 = extraRepo.findByUserId(user2).orElse(null);
 
         if (extras2 == null) {
             extras2 = UserExtras.builder()
-                    .username(user2)
+                    .userId(user2)
                     .friends(Set.of(user1))
                     .build();
 
-
-        }
-        else{
+        } else {
             extras2.getFriends().add(user1);
         }
 
         extraRepo.save(extras2);
 
-        String roomId = getDmRoomId(user1 , user2);
+        String roomId = getDmRoomId(user1, user2);
 
         boolean flag = roomRepo.existsByRoomId(roomId);
 
         Rooms room;
 
-        //room id , user list , scope , pass , time , avl , number
-
-        if(!flag){
+        if (!flag) {
             room = Rooms.builder()
                     .roomId(roomId)
                     .timeStamp(LocalDateTime.now())
-                    .users(List.of(user1 , user2))
+                    .users(List.of(user1, user2))
                     .scopeVar(ScopeVar.DM)
                     .password(null)
-                    .avlUser(Set.of(user1 , user2))
+                    .avlUser(Set.of(user1, user2))
                     .numberAvlUser(2)
                     .build();
 
             roomRepo.save(room);
-        }else{
-
+        } else {
             room = roomRepo.findByRoomId(roomId).orElse(null);
         }
 
-        if(room == null) throw new RuntimeException("Internal Server Error");
+        if (room == null) {
+            throw new RuntimeException("Internal Server Error");
+        }
 
-        Message message = new Message(room.getRoomId() , user.getUsername() , request.message());
+        Message message = new Message(room.getRoomId(), user.getId(), request.message());
 
         messagingTemplate.convertAndSendToUser(
-                user1 ,
+                user1,
                 "/queue/dm",
                 message
         );
 
         messagingTemplate.convertAndSendToUser(
-                user2 ,
+                user2,
                 "/queue/dm",
                 message
         );
@@ -146,7 +136,7 @@ public class chatService {
         return messRepo.save(message);
     }
 
-    private String getDmRoomId(String user1 , String user2){
+    private String getDmRoomId(String user1, String user2) {
         return user1.compareTo(user2) < 0 ? user1 + user2 : user2 + user1;
     }
 }

@@ -28,11 +28,7 @@ import java.util.Objects;
 public class StompAuthConfig implements ChannelInterceptor {
 
     //provided by spring
-    private final JwtDecoder jwtDecoder;
     private final roomRepo roomRepo;
-
-    //for configuring the roles from jwt to prevent it getting null
-    private final JwtAuthenticationConverter jwtAuthenticationConverter;
 
 
 
