@@ -5,7 +5,8 @@ import {
   useRef,
   useState,
 } from 'react';
-
+import Avatar from './Avatar';
+import { useAvatars } from '../hooks/useAvatars';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
 
@@ -81,6 +82,11 @@ const ChatPage = () => {
   const usernamesRef = useRef({});
 
   const navigate = useNavigate();
+
+  // Avatar lookup for message senders.
+  const avatarOf = useAvatars(
+      messages.map((message) => message.sender)
+  );
 
   // Keep username map available inside WebSocket callbacks.
   useEffect(() => {
@@ -1014,11 +1020,13 @@ const ChatPage = () => {
                               className="group flex gap-3 rounded-md px-2 py-2 transition hover:bg-surface/50"
                           >
 
-                            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-sm font-semibold text-muted">
-                              {(
-                                  message.displaySender?.[0] ||
-                                  '?'
-                              ).toUpperCase()}
+                            {/* Avatar */}
+                            <div className="mt-0.5">
+                              <Avatar
+                                  src={avatarOf(message.sender)}
+                                  name={message.displaySender}
+                                  size={32}
+                              />
                             </div>
 
                             <div className="min-w-0 flex-1">

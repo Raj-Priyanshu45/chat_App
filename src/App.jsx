@@ -10,6 +10,9 @@ import VerifyEmailPage from './components/VerifyEmailPage';
 import CompleteProfilePage from './components/CompleteProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ChatProvider } from './context/ChatContext';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
+
 import './App.css';
 
 function App() {
@@ -34,6 +37,8 @@ function App() {
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Routes>
         </BrowserRouter>
       </ChatProvider>

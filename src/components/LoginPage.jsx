@@ -75,10 +75,20 @@ const LoginPage = () => {
                     onChange={handleChange}
                     autoComplete="current-password"
                 />
+
+                <div className="mt-2 text-right">
+                    <Link
+                        to="/forgot-password"
+                        className="text-xs text-muted transition-colors hover:text-amber"
+                    >
+                        Forgot password?
+                    </Link>
+                </div>
+
                 <button
                     type="submit"
                     disabled={busy}
-                    className="mt-8 w-full rounded-md bg-amber px-4 py-3 text-sm font-semibold text-ink transition hover:bg-amber-dim disabled:cursor-not-allowed disabled:opacity-40"
+                    className="mt-6 w-full rounded-md bg-amber px-4 py-3 text-sm font-semibold text-ink transition hover:bg-amber-dim disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     {busy ? 'Logging in…' : 'Log in'}
                 </button>

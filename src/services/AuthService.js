@@ -29,3 +29,13 @@ export const logoutApi = async () => {
 // Full-page redirect, not an axios call: Spring owns the OAuth dance.
 // provider: 'google' | 'github'
 export const oauthUrl = (provider) => `${baseURL}/oauth2/authorization/${provider}`;
+
+export const forgotPasswordApi = async (gmail) => {
+    const response = await httpClient.post('/auth/forgot-password', { gmail });
+    return response.data;
+};
+
+export const resetPasswordApi = async (token, newPassword) => {
+    const response = await httpClient.post('/auth/reset-password', { token, newPassword });
+    return response.data;
+};

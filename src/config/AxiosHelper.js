@@ -19,8 +19,8 @@ const SESSION_LIFETIME_MS = 10 * 60 * 1000;
 const SESSION_ISSUING_PATHS = ['/auth/login', '/auth/verify-email', '/auth/comp-profile'];
 
 // A 401 from these must NOT trigger refresh+retry (would loop or make no sense).
-const NO_RETRY_PATHS = ['/auth/login', '/auth/register', '/auth/verify-email', '/auth/refresh-token'];
-
+const NO_RETRY_PATHS = ['/auth/login', '/auth/register', '/auth/verify-email',
+    '/auth/refresh-token', '/auth/forgot-password', '/auth/reset-password'];
 let sessionIssuedAt = 0;
 let refreshPromise = null;
 let authFailureHandler = () => {};

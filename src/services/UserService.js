@@ -71,3 +71,14 @@ export const getAllUsersApi = async (
 
   return response.data;
 };
+
+export const lookupBriefsApi = async (ids = []) => {
+    const uniqueIds = [...new Set(ids.filter((id) => typeof id === 'string' && id.trim()))].slice(0, 100);
+    if (uniqueIds.length === 0) return {};
+
+    const response = await httpClient.get('/api/v1/users/briefs', {
+        params: { ids: uniqueIds },
+        paramsSerializer: { indexes: null },
+    });
+    return response.data || {};
+};
