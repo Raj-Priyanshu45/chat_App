@@ -100,19 +100,14 @@ const LoginPage = () => {
                 <span className="h-px flex-1 bg-border-subtle" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
                 <a
                     href={oauthUrl('google')}
                     className="rounded-md border border-border-subtle px-4 py-3 text-center text-sm font-semibold text-cream transition hover:border-amber hover:text-amber"
                 >
                     Google
                 </a>
-                <a
-                    href={oauthUrl('github')}
-                    className="rounded-md border border-border-subtle px-4 py-3 text-center text-sm font-semibold text-cream transition hover:border-amber hover:text-amber"
-                >
-                    GitHub
-                </a>
+
             </div>
         </AuthShell>
     );

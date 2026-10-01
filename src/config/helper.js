@@ -1,25 +1,63 @@
+const HAS_ZONE = /(Z|[+-]\d{2}:?\d{2})$/i;
+
 const parseDateValue = (value) => {
   if (!value) return null;
 
   if (typeof value === 'string') {
-    return new Date(value);
+    const date = new Date(
+        HAS_ZONE.test(value)
+            ? value
+            : `${value}Z`
+    );
+
+    return Number.isNaN(date.getTime())
+        ? null
+        : date;
   }
 
   if (Array.isArray(value) && value.length >= 6) {
-    return new Date(value[0], value[1] - 1, value[2], value[3], value[4], value[5]);
+    return new Date(
+        Date.UTC(
+            value[0],
+            value[1] - 1,
+            value[2],
+            value[3],
+            value[4],
+            value[5]
+        )
+    );
   }
 
-  if (typeof value === 'object' && value !== null) {
-    const { year, monthValue, dayOfMonth, hour, minute, second } = value;
-    if (typeof year === 'number' && typeof monthValue === 'number' && typeof dayOfMonth === 'number') {
-      return new Date(year, monthValue - 1, dayOfMonth, hour || 0, minute || 0, second || 0);
+  if (typeof value === 'object') {
+    const {
+      year,
+      monthValue,
+      dayOfMonth,
+      hour,
+      minute,
+      second,
+    } = value;
+
+    if (
+        typeof year === 'number' &&
+        typeof monthValue === 'number' &&
+        typeof dayOfMonth === 'number'
+    ) {
+      return new Date(
+          Date.UTC(
+              year,
+              monthValue - 1,
+              dayOfMonth,
+              hour || 0,
+              minute || 0,
+              second || 0
+          )
+      );
     }
   }
 
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return null;
 };
-
 export const formatTime = (value) => {
   const date = parseDateValue(value);
   if (!date) return '';
