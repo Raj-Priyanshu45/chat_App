@@ -1,108 +1,70 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import Keycloak from 'keycloak-js';
-import { getAuthToken, setAuthToken } from '../config/AxiosHelper';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { setAuthFailureHandler } from '../config/AxiosHelper';
+import { getMyProfile } from '../services/ProfileService';
+import { loginApi, logoutApi } from '../services/AuthService';
+import { primeUsername } from '../hooks/useUsernames';
 
 const AuthContext = createContext(null);
 
-const keycloakConfig = {
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8181/',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'chat-app',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'vite-frontend',
-};
-
-const kc = new Keycloak(keycloakConfig);
-
-const parseUser = (keycloak) => {
-  const parsed = keycloak.tokenParsed || {};
-  return {
-    subject: parsed.sub || '',
-    name: parsed.name || parsed.preferred_username || parsed.email || parsed.sub || '',
-    username: parsed.preferred_username || parsed.email || parsed.sub || '',
-    email: parsed.email || '',
-  };
-};
-
 export const AuthProvider = ({ children }) => {
   const [authInitialized, setAuthInitialized] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [token, setToken] = useState(getAuthToken());
   const [user, setUser] = useState(null);
-  const [keycloak, setKeycloak] = useState(null);
-  const isRun = useRef(false);
+  // true when a JWT exists but the account is INCOMPLETE (OAuth user hasn't picked a username yet)
+  const [needsProfile, setNeedsProfile] = useState(false);
 
-  useEffect(() => {
-    if (isRun.current) return;
-    isRun.current = true;
-
-    kc.init({ onLoad: 'login-required', pkceMethod: 'S256' })
-      .then((isAuthenticated) => {
-        setKeycloak(kc);
-        setAuthenticated(isAuthenticated);
-
-        if (isAuthenticated && kc.token) {
-          setToken(kc.token);
-          setAuthToken(kc.token);
-          setUser(parseUser(kc));
-        } else {
-          setAuthToken(null);
-        }
-
-        setAuthInitialized(true);
-      })
-      .catch((err) => {
-        console.error('Keycloak init failed', err);
-        setKeycloak(kc);
-        setAuthInitialized(true);
-      });
+  // The httpOnly cookie is invisible to JS, so the only way to know who we are is to ask the server.
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await getMyProfile();
+      primeUsername(me.id, me.username);
+      setUser(me);
+      setNeedsProfile(false);
+      return me;
+    } catch (error) {
+      setUser(null);
+      setNeedsProfile(error?.response?.status === 403);
+      return null;
+    }
   }, []);
 
   useEffect(() => {
-    if (!keycloak || !authenticated) return undefined;
+    refreshUser().finally(() => setAuthInitialized(true));
+  }, [refreshUser]);
 
-    const refreshToken = async () => {
-      try {
-        const refreshed = await keycloak.updateToken(30);
-        if (refreshed) {
-          setToken(keycloak.token);
-          setAuthToken(keycloak.token);
-          setUser(parseUser(keycloak));
-        }
-      } catch {
-        setAuthToken(null);
-        setAuthenticated(false);
-        setUser(null);
-      }
-    };
+  // Axios calls this when a refresh attempt fails -> session is really gone.
+  useEffect(() => {
+    setAuthFailureHandler(() => setUser(null));
+  }, []);
 
-    const interval = window.setInterval(refreshToken, 60000);
-    return () => window.clearInterval(interval);
-  }, [keycloak, authenticated]);
+  const login = useCallback(
+      async (username, password) => {
+        await loginApi(username, password);
+        return refreshUser();
+      },
+      [refreshUser]
+  );
 
-  const login = useCallback(() => {
-    if (!keycloak) return Promise.reject(new Error('Keycloak is not initialized yet'));
-    return keycloak.login();
-  }, [keycloak]);
-
-  const logout = useCallback(() => {
-    if (!keycloak) return;
-    keycloak.logout({ redirectUri: window.location.origin });
-    setAuthToken(null);
-    setToken(null);
-    setAuthenticated(false);
+  const logout = useCallback(async () => {
+    try {
+      await logoutApi();
+    } catch {
+      // cookies may already be gone; clear local state regardless
+    }
     setUser(null);
-  }, [keycloak]);
+    setNeedsProfile(false);
+  }, []);
 
   const value = useMemo(
-    () => ({
-      authInitialized,
-      authenticated,
-      token,
-      user,
-      login,
-      logout,
-      keycloak,
-    }),
-    [authInitialized, authenticated, token, user, login, logout, keycloak]
+      () => ({
+        authInitialized,
+        authenticated: Boolean(user),
+        needsProfile,
+        user,
+        login,
+        logout,
+        refreshUser,
+      }),
+      [authInitialized, user, needsProfile, login, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

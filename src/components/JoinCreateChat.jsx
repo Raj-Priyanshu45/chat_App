@@ -8,11 +8,9 @@ import { createRoomApi, joinChatApi } from '../services/RoomService';
 
 const JoinCreateChat = () => {
   const [detail, setDetail] = useState({ roomId: '', scope: 'Public', password: '' });
-  const { setRoomId, setCurrentUser, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
-  const auth = useAuth();
+  const { setRoomId, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
+  const { logout } = useAuth();
   const navigate = useNavigate();
-
-  const currentUsername = auth.user?.username || auth.user?.name || '';
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -31,37 +29,30 @@ const JoinCreateChat = () => {
     return true;
   };
 
-  const joinChat = async () => {
-    if (!auth.authenticated) {
-      await auth.login();
-      return;
-    }
+  const enterRoom = (room, fallbackId) => {
+    setRoomUsers(room.users || []);
+    setIsDm(false);
+    setDmTarget('');
+    setRoomId(room.roomId || fallbackId);
+    setConnected(true);
+    navigate('/chat');
+  };
 
+  const joinChat = async () => {
     if (!validateForm()) return;
 
     try {
       const room = await joinChatApi(detail.roomId.trim(), detail.password || null);
-      setCurrentUser(currentUsername);
-      setRoomUsers(room.users || []);
-      setIsDm(false);
-      setDmTarget('');
-      setRoomId(room.roomId || detail.roomId.trim());
-      setConnected(true);
       toast.success('Joined room successfully.');
-      navigate('/chat');
+      enterRoom(room, detail.roomId.trim());
     } catch (error) {
       console.error('Join room failed:', error);
       const message = error?.response?.data || 'Unable to join room.';
-      toast.error(message);
+      toast.error(typeof message === 'string' ? message : 'Unable to join room.');
     }
   };
 
   const createRoom = async () => {
-    if (!auth.authenticated) {
-      await auth.login();
-      return;
-    }
-
     if (!validateForm()) return;
 
     if (detail.scope === 'Private' && !detail.password.trim()) {
@@ -70,24 +61,23 @@ const JoinCreateChat = () => {
     }
 
     try {
-      const response = await createRoomApi(
+      const room = await createRoomApi(
           detail.roomId.trim(),
           detail.scope,
           detail.password.trim() || null
       );
-      setCurrentUser(currentUsername);
-      setRoomUsers(response.users || []);
-      setIsDm(false);
-      setDmTarget('');
-      setRoomId(response.roomId || detail.roomId.trim());
-      setConnected(true);
       toast.success('Room created successfully.');
-      navigate('/chat');
+      enterRoom(room, detail.roomId.trim());
     } catch (error) {
       console.error('Create room failed:', error);
       const message = error?.response?.data || 'Unable to create room.';
-      toast.error(message);
+      toast.error(typeof message === 'string' ? message : 'Unable to create room.');
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   return (
@@ -106,7 +96,7 @@ const JoinCreateChat = () => {
             </h1>
             <p className="mt-6 text-base leading-relaxed text-muted">
               Rooms, direct messages, and file sharing over a single live connection —
-              STOMP over WebSocket, authenticated with Keycloak, backed by MongoDB.
+              STOMP over WebSocket, secured with cookie-based JWT, backed by MongoDB.
             </p>
           </div>
 
@@ -134,87 +124,84 @@ const JoinCreateChat = () => {
               <Link to="/profile" className="text-amber hover:text-cream transition-colors">
                 View profile
               </Link>
+              <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="text-muted hover:text-cream transition-colors"
+              >
+                Log out
+              </button>
             </div>
 
-            {!auth.authInitialized ? (
-                <div className="mt-10 flex h-24 items-center justify-center">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-subtle border-t-amber" />
+            <div className="mt-8">
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
+                Room ID
+              </label>
+              <input
+                  type="text"
+                  name="roomId"
+                  value={detail.roomId}
+                  onChange={handleInputChange}
+                  placeholder="room-1234"
+                  className="w-full rounded-md border border-border-subtle bg-surface px-4 py-3 font-mono text-sm text-cream placeholder-muted/60 outline-none transition focus:border-amber"
+              />
+            </div>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
+                Room type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {['Public', 'Private'].map((option) => (
+                    <button
+                        key={option}
+                        type="button"
+                        onClick={() => setDetail((prev) => ({ ...prev, scope: option }))}
+                        className={`rounded-md border px-4 py-2.5 text-sm font-medium transition ${
+                            detail.scope === option
+                                ? 'border-amber bg-amber/10 text-amber'
+                                : 'border-border-subtle bg-surface text-muted hover:text-cream'
+                        }`}
+                    >
+                      {option}
+                    </button>
+                ))}
+              </div>
+            </div>
+
+            {detail.scope === 'Private' && (
+                <div className="mt-5">
+                  <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
+                    Password
+                  </label>
+                  <input
+                      type="password"
+                      name="password"
+                      value={detail.password}
+                      onChange={handleInputChange}
+                      placeholder="Room password"
+                      className="w-full rounded-md border border-border-subtle bg-surface px-4 py-3 text-sm text-cream placeholder-muted/60 outline-none transition focus:border-amber"
+                  />
                 </div>
-            ) : (
-                <>
-                  <div className="mt-8">
-                    <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
-                      Room ID
-                    </label>
-                    <input
-                        type="text"
-                        name="roomId"
-                        value={detail.roomId}
-                        onChange={handleInputChange}
-                        placeholder="room-1234"
-                        className="w-full rounded-md border border-border-subtle bg-surface px-4 py-3 font-mono text-sm text-cream placeholder-muted/60 outline-none transition focus:border-amber"
-                    />
-                  </div>
-
-                  <div className="mt-5">
-                    <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
-                      Room type
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['Public', 'Private'].map((option) => (
-                          <button
-                              key={option}
-                              type="button"
-                              onClick={() => setDetail((prev) => ({ ...prev, scope: option }))}
-                              className={`rounded-md border px-4 py-2.5 text-sm font-medium transition ${
-                                  detail.scope === option
-                                      ? 'border-amber bg-amber/10 text-amber'
-                                      : 'border-border-subtle bg-surface text-muted hover:text-cream'
-                              }`}
-                          >
-                            {option}
-                          </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {detail.scope === 'Private' && (
-                      <div className="mt-5">
-                        <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted">
-                          Password
-                        </label>
-                        <input
-                            type="password"
-                            name="password"
-                            value={detail.password}
-                            onChange={handleInputChange}
-                            placeholder="Room password"
-                            className="w-full rounded-md border border-border-subtle bg-surface px-4 py-3 text-sm text-cream placeholder-muted/60 outline-none transition focus:border-amber"
-                        />
-                      </div>
-                  )}
-
-                  <div className="mt-8 flex gap-3">
-                    <button
-                        type="button"
-                        onClick={joinChat}
-                        disabled={!auth.authenticated}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-md bg-amber px-4 py-3 text-sm font-semibold text-ink transition hover:bg-amber-dim disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Join room
-                      <MdArrowForward size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={createRoom}
-                        disabled={!auth.authenticated}
-                        className="flex-1 rounded-md border border-border-subtle px-4 py-3 text-sm font-semibold text-cream transition hover:border-amber hover:text-amber disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Create room
-                    </button>
-                  </div>
-                </>
             )}
+
+            <div className="mt-8 flex gap-3">
+              <button
+                  type="button"
+                  onClick={joinChat}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md bg-amber px-4 py-3 text-sm font-semibold text-ink transition hover:bg-amber-dim"
+              >
+                Join room
+                <MdArrowForward size={16} />
+              </button>
+              <button
+                  type="button"
+                  onClick={createRoom}
+                  className="flex-1 rounded-md border border-border-subtle px-4 py-3 text-sm font-semibold text-cream transition hover:border-amber hover:text-amber"
+              >
+                Create room
+              </button>
+            </div>
           </div>
         </div>
       </div>

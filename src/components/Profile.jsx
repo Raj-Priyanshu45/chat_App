@@ -3,36 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MdArrowBack, MdChatBubbleOutline, MdMeetingRoom } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
-import useAuth from '../context/AuthContext';
 import { getMyProfile } from '../services/ProfileService';
 import { joinChatApi, computeDmRoomId } from '../services/RoomService';
+import { useUsernames } from '../hooks/useUsernames';
 
 const Profile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { setRoomId, setCurrentUser, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
-  const auth = useAuth();
+  const { setRoomId, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!auth.authenticated) {
-      navigate('/');
-      return;
-    }
+  // friends are stored as user ids on the backend
+  const nameOf = useUsernames(profile?.friends);
 
+  useEffect(() => {
     getMyProfile()
         .then(setProfile)
         .catch(() => toast.error('Unable to load profile.'))
         .finally(() => setLoading(false));
-  }, [auth.authenticated, navigate]);
+  }, []);
 
   // Same pattern DiscoverRooms/ChatPage use to jump into a DM: set context
   // state and let ChatPage's own effect open the STOMP connection.
-  const handleMessageFriend = (friendUsername) => {
-    setCurrentUser(profile.username);
+  // Both the target and the room id are built from user IDS, matching the backend.
+  const handleMessageFriend = (friendId) => {
     setIsDm(true);
-    setDmTarget(friendUsername);
-    setRoomId(computeDmRoomId(profile.username, friendUsername));
+    setDmTarget(friendId);
+    setRoomId(computeDmRoomId(profile.id, friendId));
     setConnected(true);
     navigate('/chat');
   };
@@ -40,7 +37,6 @@ const Profile = () => {
   const handleRejoinRoom = async (roomId) => {
     try {
       const room = await joinChatApi(roomId, null);
-      setCurrentUser(profile.username);
       setRoomUsers(room.users || []);
       setIsDm(false);
       setDmTarget('');
@@ -69,6 +65,9 @@ const Profile = () => {
     );
   }
 
+  const friends = profile.friends || [];
+  const roomHistory = profile.roomHistory || [];
+
   return (
       <div className="min-h-screen bg-ink px-6 py-10 text-cream">
         <div className="mx-auto max-w-xl">
@@ -96,26 +95,26 @@ const Profile = () => {
           {/* Friends */}
           <div className="mb-8">
             <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">Friends</h2>
-            {profile.friends.length === 0 ? (
+            {friends.length === 0 ? (
                 <p className="text-sm text-muted">No friends yet — message someone to add them here.</p>
             ) : (
                 <div className="overflow-hidden rounded-md border border-border-subtle">
-                  {profile.friends.map((friend, index) => (
+                  {friends.map((friendId, index) => (
                       <div
-                          key={friend}
+                          key={friendId}
                           className={`flex items-center justify-between px-4 py-3 ${
                               index !== 0 ? 'border-t border-border-subtle' : ''
                           }`}
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-surface-raised text-sm font-semibold text-muted">
-                            {friend[0]?.toUpperCase()}
+                            {nameOf(friendId)[0]?.toUpperCase()}
                           </div>
-                          <span className="font-mono text-sm text-cream">{friend}</span>
+                          <span className="font-mono text-sm text-cream">{nameOf(friendId)}</span>
                         </div>
                         <button
                             type="button"
-                            onClick={() => handleMessageFriend(friend)}
+                            onClick={() => handleMessageFriend(friendId)}
                             className="flex items-center gap-1.5 rounded-md border border-border-subtle px-3 py-1.5 text-xs text-muted transition hover:border-amber hover:text-amber"
                         >
                           <MdChatBubbleOutline size={14} />
@@ -130,11 +129,11 @@ const Profile = () => {
           {/* Room history */}
           <div>
             <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">Room history</h2>
-            {profile.roomHistory.length === 0 ? (
+            {roomHistory.length === 0 ? (
                 <p className="text-sm text-muted">No rooms joined yet — create or join one to see it here.</p>
             ) : (
                 <div className="overflow-hidden rounded-md border border-border-subtle">
-                  {profile.roomHistory.map((roomId, index) => (
+                  {roomHistory.map((roomId, index) => (
                       <div
                           key={roomId}
                           className={`flex items-center justify-between px-4 py-3 ${

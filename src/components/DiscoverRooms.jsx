@@ -3,36 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MdArrowBack } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
-import useAuth from '../context/AuthContext';
 import { getPublicRooms, joinChatApi } from '../services/RoomService';
-import { getMyInfo } from '../services/UserService';
 
 const DiscoverRooms = () => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('');
 
-  const {
-    setRoomId,
-    setCurrentUser,
-    setConnected,
-    setRoomUsers,
-    setIsDm,
-    setDmTarget,
-  } = useChatContext();
-
-  const auth = useAuth();
+  const { setRoomId, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!auth.authenticated) return;
-
     const loadRooms = async () => {
       try {
         setLoading(true);
         const page = await getPublicRooms(20, 0, sortBy);
         setRooms(page?.content || []);
-      } catch (error) {
+      } catch {
         toast.error('Unable to load public rooms.');
       } finally {
         setLoading(false);
@@ -40,14 +27,12 @@ const DiscoverRooms = () => {
     };
 
     loadRooms();
-  }, [auth.authenticated, sortBy]);
+  }, [sortBy]);
 
   const handleJoin = async (roomId) => {
     try {
       const room = await joinChatApi(roomId, null);
-      const info = await getMyInfo();
 
-      setCurrentUser(info?.username || info?.name || '');
       setRoomUsers(room?.users || []);
       setIsDm(false);
       setDmTarget('');

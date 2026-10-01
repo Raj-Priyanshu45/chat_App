@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { MdMoreVert, MdClose } from 'react-icons/md';
+import { useUsernames } from '../hooks/useUsernames';
 
+// `members` are user ids (excluding yourself); names are resolved through useUsernames.
 const MembersModal = ({ members, onMessagePrivately, onClose }) => {
   const [openMenuFor, setOpenMenuFor] = useState(null);
+  const nameOf = useUsernames(members);
 
   return (
       <div
@@ -28,33 +31,33 @@ const MembersModal = ({ members, onMessagePrivately, onClose }) => {
               <p className="text-sm text-muted">No other members in this room.</p>
           ) : (
               <ul className="flex flex-col gap-1">
-                {members.map((member) => (
+                {members.map((memberId) => (
                     <li
-                        key={member}
+                        key={memberId}
                         className="relative flex items-center justify-between rounded-md px-3 py-2 hover:bg-surface-raised"
                     >
                       <div className="flex items-center gap-2.5">
                         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-surface-raised text-sm font-semibold text-muted">
-                          {member[0]?.toUpperCase()}
+                          {nameOf(memberId)[0]?.toUpperCase()}
                         </div>
-                        <span className="font-mono text-sm text-cream">{member}</span>
+                        <span className="font-mono text-sm text-cream">{nameOf(memberId)}</span>
                       </div>
 
                       <button
                           type="button"
-                          onClick={() => setOpenMenuFor(openMenuFor === member ? null : member)}
+                          onClick={() => setOpenMenuFor(openMenuFor === memberId ? null : memberId)}
                           className="rounded-md p-1 text-muted transition hover:bg-ink hover:text-cream"
                       >
                         <MdMoreVert size={18} />
                       </button>
 
-                      {openMenuFor === member && (
+                      {openMenuFor === memberId && (
                           <div className="absolute right-2 top-11 z-10 w-44 rounded-md border border-border-subtle bg-surface-raised py-1 shadow-xl">
                             <button
                                 type="button"
                                 onClick={() => {
                                   setOpenMenuFor(null);
-                                  onMessagePrivately(member);
+                                  onMessagePrivately(memberId);
                                   onClose();
                                 }}
                                 className="block w-full px-4 py-2 text-left text-sm text-cream hover:bg-ink"

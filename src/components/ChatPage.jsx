@@ -5,25 +5,48 @@ import toast from 'react-hot-toast';
 import { MdSend, MdAttachFile, MdGroup, MdLogout, MdPerson, MdExplore } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
-import { getWebSocketUrl } from '../config/AxiosHelper';
+import { ensureFreshSession, getWebSocketUrl } from '../config/AxiosHelper';
 import {
   getMessages,
   getMessagesSince,
+  getRoomMembersApi,
   leaveRoomApi,
   uploadFileApi,
   uploadDmFileApi,
   computeDmRoomId,
 } from '../services/RoomService';
 import { formatTime, toBackendTimestamp } from '../config/helper';
+import { useUsernames } from '../hooks/useUsernames';
 import MediaMessage from './MediaMessage';
 import MembersModal from './MembersModal';
 
+// Ignore a message we already have (REST history + live socket can overlap).
+const appendMessage = (prev, message) =>
+    message.id && prev.some((m) => m.id === message.id) ? prev : [...prev, message];
+
+// Small component so the toast can resolve the sender's username with the hook.
+const DmToast = ({ payload, onOpen }) => {
+  const nameOf = useUsernames([payload.sender]);
+
+  return (
+      <div
+          onClick={onOpen}
+          className="cursor-pointer rounded-md border border-border-subtle bg-surface-raised px-4 py-3 text-sm text-cream shadow-xl"
+      >
+        <p className="font-semibold text-amber">New message from {nameOf(payload.sender)}</p>
+        <p className="mt-1 truncate text-muted">
+          {payload.type === 'TEXT' ? payload.content : `Sent a ${payload.type?.toLowerCase()}`}
+        </p>
+      </div>
+  );
+};
+
 const ChatPage = () => {
   const {
-    roomId, currentUser, connected, roomUsers, isDm, dmTarget,
-    setConnected, setRoomId, setCurrentUser, setIsDm, setDmTarget,
+    roomId, connected, roomUsers, isDm, dmTarget,
+    setConnected, setRoomId, setRoomUsers, setIsDm, setDmTarget,
   } = useChatContext();
-  const { authenticated, token, user, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [stompClient, setStompClient] = useState(null);
@@ -33,14 +56,38 @@ const ChatPage = () => {
   const lastMessageTimestampRef = useRef(null);
   const navigate = useNavigate();
 
-  // isDm/dmTarget change frequently inside the onConnect closure below —
-  // refs let the closure always read the *current* value instead of the
-  // value captured when the STOMP client was first created.
+  // The backend identifies every user by id, so "me" is user.id (not the username).
+  const currentUserId = user?.id || '';
+
+  // The STOMP callbacks below are created once per connection; refs let them read
+  // the *current* values instead of the ones captured at creation time.
   const isDmRef = useRef(isDm);
   const dmTargetRef = useRef(dmTarget);
+  const roomIdRef = useRef(roomId);
+  const startDmRef = useRef(null);
   useEffect(() => { isDmRef.current = isDm; }, [isDm]);
   useEffect(() => { dmTargetRef.current = dmTarget; }, [dmTarget]);
+  useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
 
+  const scrollToBottom = () => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTo({
+        top: chatBoxRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  const startDm = (targetId) => {
+    setMessages([]);
+    lastMessageTimestampRef.current = null;
+    setIsDm(true);
+    setDmTarget(targetId);
+    setRoomId(computeDmRoomId(currentUserId, targetId));
+  };
+  startDmRef.current = startDm;
+
+  /* ---------- load history ---------- */
   useEffect(() => {
     if (!connected) {
       navigate('/');
@@ -56,6 +103,7 @@ const ChatPage = () => {
         }
         scrollToBottom();
       } catch (error) {
+        // A DM room only exists after the first message, so a 404 is normal there.
         if (isDm && error?.response?.status === 404) {
           setMessages([]);
           return;
@@ -67,18 +115,21 @@ const ChatPage = () => {
     loadMessages();
   }, [connected, navigate, roomId, isDm]);
 
+  /* ---------- websocket ---------- */
   useEffect(() => {
-    if (!authenticated || !connected || !roomId || !token) {
-      if (!authenticated) {
-        navigate('/');
-      }
-      return undefined;
-    }
+    if (!connected || !roomId) return undefined;
 
     const client = new Client({
       brokerURL: getWebSocketUrl(),
-      connectHeaders: {
-        Authorization: `Bearer ${token}`,
+      // No Authorization header anymore: the browser sends the JWT cookie on the
+      // handshake. Because the cookie is only checked at handshake time, refresh it
+      // first if it is old, otherwise a reconnect after 15 min would be rejected.
+      beforeConnect: async () => {
+        try {
+          await ensureFreshSession();
+        } catch {
+          // handshake will fail and stomp will retry
+        }
       },
       reconnectDelay: 5000,
       onConnect: () => {
@@ -89,7 +140,7 @@ const ChatPage = () => {
           client.subscribe(`/topic/room/${roomId}`, (message) => {
             try {
               const payload = JSON.parse(message.body);
-              setMessages((prev) => [...prev, payload]);
+              setMessages((prev) => appendMessage(prev, payload));
               lastMessageTimestampRef.current = payload.timeStamp;
               scrollToBottom();
             } catch {
@@ -98,35 +149,26 @@ const ChatPage = () => {
           });
         }
 
-        // Always subscribed, regardless of current view — this is what lets
-        // a DM notification pop up even while you're inside a group room.
+        // Always subscribed, so a DM notification can pop up even while you are in a group room.
+        // The server sends your own DMs here too (to both participants).
         client.subscribe('/user/queue/dm', (message) => {
           try {
             const payload = JSON.parse(message.body);
-            const viewingThisDm = isDmRef.current && dmTargetRef.current === payload.sender;
+            const viewingThisDm = isDmRef.current && payload.roomId === roomIdRef.current;
 
             if (viewingThisDm) {
-              setMessages((prev) => [...prev, payload]);
+              setMessages((prev) => appendMessage(prev, payload));
               lastMessageTimestampRef.current = payload.timeStamp;
               scrollToBottom();
-            } else {
+            } else if (payload.sender !== currentUserId) {
               toast.custom((t) => (
-                  <div
-                      onClick={() => {
+                  <DmToast
+                      payload={payload}
+                      onOpen={() => {
                         toast.dismiss(t.id);
-                        setMessages([]);
-                        lastMessageTimestampRef.current = null;
-                        setIsDm(true);
-                        setDmTarget(payload.sender);
-                        setRoomId(computeDmRoomId(currentUserId, payload.sender));
+                        startDmRef.current(payload.sender);
                       }}
-                      className="cursor-pointer rounded-md border border-border-subtle bg-surface-raised px-4 py-3 text-sm text-cream shadow-xl"
-                  >
-                    <p className="font-semibold text-amber">New message from {payload.sender}</p>
-                    <p className="mt-1 truncate text-muted">
-                      {payload.type === 'TEXT' ? payload.content : `Sent a ${payload.type?.toLowerCase()}`}
-                    </p>
-                  </div>
+                  />
               ));
             }
           } catch {
@@ -149,6 +191,7 @@ const ChatPage = () => {
           }
         });
 
+        // Reconnect catch-up: fetch whatever arrived while the socket was down.
         if (lastMessageTimestampRef.current) {
           const since = toBackendTimestamp(lastMessageTimestampRef.current);
           if (since) {
@@ -165,7 +208,7 @@ const ChatPage = () => {
                   scrollToBottom();
                 })
                 .catch(() => {
-                  if (!isDm) toast.error('Unable to fetch missed messages.');
+                  if (!isDmRef.current) toast.error('Unable to fetch missed messages.');
                 });
           }
         }
@@ -187,26 +230,13 @@ const ChatPage = () => {
       client.deactivate();
       setStompClient(null);
     };
-  }, [authenticated, connected, roomId, token, navigate, isDm]);
+  }, [connected, roomId, isDm, currentUserId]);
 
   useEffect(() => {
-    if (chatBoxRef.current) {
-      chatBoxRef.current.scrollTo({
-        top: chatBoxRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
+    scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
-    if (chatBoxRef.current) {
-      chatBoxRef.current.scrollTo({
-        top: chatBoxRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-  };
-
+  /* ---------- actions ---------- */
   const sendMessage = () => {
     if (!stompClient || !connected || !input.trim()) {
       return;
@@ -215,6 +245,7 @@ const ChatPage = () => {
     const payload = { message: input.trim() };
 
     try {
+      // dmTarget is the other user's id (the backend looks users up by id)
       const destination = isDm
           ? `/app/dm/${dmTarget}`
           : `/app/sendMessages/${roomId}`;
@@ -244,9 +275,14 @@ const ChatPage = () => {
     }
   };
 
-  const handleLeaveRoom = async () => {
-    if (stompClient) stompClient.deactivate();
+  const resetChatState = () => {
+    setConnected(false);
+    setRoomId('');
+    setIsDm(false);
+    setDmTarget('');
+  };
 
+  const handleLeaveRoom = async () => {
     if (!isDm) {
       try {
         await leaveRoomApi(roomId);
@@ -255,16 +291,11 @@ const ChatPage = () => {
       }
     }
 
-    setConnected(false);
-    setRoomId('');
-    setIsDm(false);
-    setDmTarget('');
+    resetChatState();
     navigate('/');
   };
 
   const handleLogout = async () => {
-    if (stompClient) stompClient.deactivate();
-
     if (!isDm) {
       try {
         await leaveRoomApi(roomId);
@@ -273,27 +304,22 @@ const ChatPage = () => {
       }
     }
 
-    setConnected(false);
-    setRoomId('');
-    setCurrentUser('');
-    setIsDm(false);
-    setDmTarget('');
-    logout();
-    navigate('/');
+    resetChatState();
+    await logout();
+    navigate('/login');
   };
 
-  const handleStartDm = (targetUsername) => {
-    if (stompClient) stompClient.deactivate();
-
-    setMessages([]);
-    lastMessageTimestampRef.current = null;
-    setIsDm(true);
-    setDmTarget(targetUsername);
-    setRoomId(computeDmRoomId(currentUserId, targetUsername));
+  // Membership changes over time, so fetch the live list when the modal opens.
+  const openMembers = async () => {
+    try {
+      setRoomUsers(await getRoomMembersApi(roomId));
+    } catch {
+      // fall back to whatever we already have
+    }
+    setShowMembers(true);
   };
 
-  const currentUserId = currentUser || user?.username || user?.name || user?.subject || '';
-
+  /* ---------- derived data ---------- */
   const groupedMessages = useMemo(() => {
     return messages.map((message, index) => ({
       ...message,
@@ -302,9 +328,15 @@ const ChatPage = () => {
   }, [messages]);
 
   const otherMembers = useMemo(
-      () => (roomUsers || []).filter((u) => u !== currentUserId),
+      () => (roomUsers || []).filter((id) => id !== currentUserId),
       [roomUsers, currentUserId]
   );
+
+  const senderIds = useMemo(
+      () => [...new Set(messages.map((m) => m.sender))],
+      [messages]
+  );
+  const nameOf = useUsernames([...senderIds, dmTarget, currentUserId]);
 
   return (
       <div className="flex h-screen bg-ink text-cream">
@@ -315,7 +347,7 @@ const ChatPage = () => {
               {isDm ? 'direct message' : 'live room'}
             </p>
             <p className="mt-1 truncate font-mono text-sm text-cream">
-              {isDm ? dmTarget : roomId}
+              {isDm ? nameOf(dmTarget) : roomId}
             </p>
           </div>
 
@@ -323,7 +355,7 @@ const ChatPage = () => {
             {!isDm && (
                 <button
                     type="button"
-                    onClick={() => setShowMembers(true)}
+                    onClick={openMembers}
                     className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted transition hover:bg-surface-raised hover:text-cream"
                 >
                   <MdGroup size={17} />
@@ -351,7 +383,7 @@ const ChatPage = () => {
           <div className="space-y-1 border-t border-border-subtle px-3 py-4">
             <div className="mb-2 flex items-center gap-2 rounded-md bg-surface-raised px-3 py-2">
               <span className="h-2 w-2 shrink-0 rounded-full bg-sage" />
-              <span className="truncate font-mono text-xs text-cream">{currentUserId || 'unknown'}</span>
+              <span className="truncate font-mono text-xs text-cream">{user?.username || 'unknown'}</span>
             </div>
             <button
                 type="button"
@@ -366,7 +398,7 @@ const ChatPage = () => {
                 className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-rose transition hover:bg-rose/10"
             >
               <MdLogout size={16} />
-              Logout
+              Log out
             </button>
           </div>
         </aside>
@@ -374,7 +406,7 @@ const ChatPage = () => {
         {showMembers && (
             <MembersModal
                 members={otherMembers}
-                onMessagePrivately={handleStartDm}
+                onMessagePrivately={startDm}
                 onClose={() => setShowMembers(false)}
             />
         )}
@@ -383,7 +415,7 @@ const ChatPage = () => {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center justify-between border-b border-border-subtle bg-surface/60 px-5 py-3.5 backdrop-blur">
             <p className="truncate font-mono text-sm text-cream">
-              {isDm ? `@${dmTarget}` : `#${roomId}`}
+              {isDm ? `@${nameOf(dmTarget)}` : `#${roomId}`}
             </p>
             <button
                 type="button"
@@ -407,7 +439,7 @@ const ChatPage = () => {
                           className="group flex gap-3 rounded-md px-2 py-2 transition hover:bg-surface/50"
                       >
                         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-raised text-sm font-semibold text-muted">
-                          {(message.sender?.[0] || '?').toUpperCase()}
+                          {(nameOf(message.sender)[0] || '?').toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline gap-2">
@@ -416,7 +448,7 @@ const ChatPage = () => {
                               message.sender === currentUserId ? 'text-amber' : 'text-cream'
                           }`}
                       >
-                        {message.sender}
+                        {nameOf(message.sender)}
                       </span>
                             <span className="font-mono text-[11px] text-muted">
                         {formatTime(message.timeStamp)}
@@ -425,7 +457,7 @@ const ChatPage = () => {
 
                           {message.type === 'IMAGE' || message.type === 'VIDEO' || message.type === 'AUDIO' ? (
                               <div className="mt-1.5">
-                                <MediaMessage filename={message.content} type={message.type} />
+                                <MediaMessage url={message.content} type={message.type} />
                               </div>
                           ) : (
                               <p className="mt-0.5 break-words text-sm leading-relaxed text-cream/90">

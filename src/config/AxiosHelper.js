@@ -2,40 +2,89 @@ import axios from 'axios';
 
 export const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
 
+// The JWT lives in an httpOnly cookie, so the browser attaches it by itself.
+// withCredentials is what makes axios send/accept cookies on cross-port requests.
 export const httpClient = axios.create({
   baseURL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-export const getAuthToken = () => localStorage.getItem('chat_app_token');
+/* ---------- session handling ---------- */
 
-export const setAuthToken = (token) => {
-  if (token) {
-    localStorage.setItem('chat_app_token', token);
-    httpClient.defaults.headers.Authorization = `Bearer ${token}`;
-  } else {
-    localStorage.removeItem('chat_app_token');
-    delete httpClient.defaults.headers.Authorization;
+// Access token lives 15 min on the backend; we treat it as "stale" a bit earlier.
+const SESSION_LIFETIME_MS = 10 * 60 * 1000;
+
+// Endpoints whose success means "the server just issued a fresh JWT cookie".
+const SESSION_ISSUING_PATHS = ['/auth/login', '/auth/verify-email', '/auth/comp-profile'];
+
+// A 401 from these must NOT trigger refresh+retry (would loop or make no sense).
+const NO_RETRY_PATHS = ['/auth/login', '/auth/register', '/auth/verify-email', '/auth/refresh-token'];
+
+let sessionIssuedAt = 0;
+let refreshPromise = null;
+let authFailureHandler = () => {};
+
+const matches = (url, list) => list.some((p) => url?.startsWith(p));
+
+export const setAuthFailureHandler = (fn) => {
+  authFailureHandler = fn;
+};
+
+// Many requests can 401 at once; they all share one refresh call.
+export const refreshSession = () => {
+  if (!refreshPromise) {
+    refreshPromise = axios
+        .get(`${baseURL}/auth/refresh-token`, { withCredentials: true })
+        .then((response) => {
+          sessionIssuedAt = Date.now();
+          return response;
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
+  }
+  return refreshPromise;
+};
+
+// Used before opening a WebSocket: the cookie is only checked at handshake time.
+export const ensureFreshSession = async () => {
+  if (Date.now() - sessionIssuedAt > SESSION_LIFETIME_MS) {
+    await refreshSession();
   }
 };
 
-httpClient.interceptors.request.use((config) => {
-  const token = getAuthToken();
+httpClient.interceptors.response.use(
+    (response) => {
+      if (matches(response.config.url, SESSION_ISSUING_PATHS)) {
+        sessionIssuedAt = Date.now();
+      }
+      return response;
+    },
+    async (error) => {
+      const original = error.config;
+      const status = error.response?.status;
 
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+      if (status !== 401 || !original || original._retried || matches(original.url, NO_RETRY_PATHS)) {
+        return Promise.reject(error);
+      }
 
-  return config;
-});
+      original._retried = true;
+
+      try {
+        await refreshSession();
+      } catch {
+        authFailureHandler();
+        return Promise.reject(error);
+      }
+
+      return httpClient(original);
+    }
+);
 
 export const getWebSocketUrl = () => {
   const url = new URL(baseURL);
   url.protocol = url.protocol.replace(/^http/, 'ws');
   url.pathname = '/chat';
-  console.log('🔌 WebSocket URL resolved to:', url.toString());
   return url.toString();
 };

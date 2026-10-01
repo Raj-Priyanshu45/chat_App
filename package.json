@@ -12,13 +12,11 @@
   "dependencies": {
     "@stomp/stompjs": "^7.3.0",
     "axios": "^1.18.1",
-    "keycloak-js": "^26.2.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.7.0",
-    "react-router-dom": "^7.18.1",
-    "sockjs-client": "^1.6.1"
+    "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
