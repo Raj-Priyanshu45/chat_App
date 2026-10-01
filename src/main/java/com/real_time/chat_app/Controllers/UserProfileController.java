@@ -1,18 +1,18 @@
 package com.real_time.chat_app.Controllers;
 
+import com.real_time.chat_app.Services.ProfileService;
 import com.real_time.chat_app.Services.ProfileUpdateService;
 import com.real_time.chat_app.anno.ActiveUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/update")
@@ -20,6 +20,7 @@ import java.security.Principal;
 public class UserProfileController {
 
     private final ProfileUpdateService profileUpdateService;
+    private final ProfileService profileService;
 
     @PostMapping("/image")
     @ActiveUser
@@ -28,5 +29,12 @@ public class UserProfileController {
             return ResponseEntity.status(201).body("");
         }
         return ResponseEntity.internalServerError().build();
+    }
+
+    @GetMapping("/lookup")
+    public ResponseEntity<Map<String, String>> lookup(
+            @RequestParam List<String> ids
+    ) {
+        return ResponseEntity.ok(profileService.usernamesById(ids));
     }
 }

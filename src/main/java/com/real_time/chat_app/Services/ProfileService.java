@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +35,13 @@ public class ProfileService {
 
         if (userExtras != null) {
 
-            List<String> friends = userExtras.getFriends().stream().toList();
+            List<String> friends = userExtras.getFriends()
+                    .stream()
+                    .map(id -> userRepo.findById(id)
+                            .map(Users::getUsername)
+                            .orElse(null))
+                    .filter(Objects::nonNull)
+                    .toList();
 
             List<String> historyOfRooms = userExtras.getRoomId().stream().toList();
 
@@ -52,5 +61,15 @@ public class ProfileService {
                 Collections.emptyList(),
                 Collections.emptyList()
         );
+    }
+
+    public Map<String, String> usernamesById(List<String> ids) {
+
+        return userRepo.findAllById(ids)
+                .stream()
+                .collect(Collectors.toMap(
+                        Users::getId,
+                        Users::getUsername
+                ));
     }
 }
