@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
-// message.content is now a full Cloudinary URL, so there is nothing to fetch:
-// the browser loads it straight from the CDN.
+// message.content is now a full Cloudinary URL.
 const MediaMessage = ({ url, type }) => {
     const [failed, setFailed] = useState(false);
 
@@ -34,7 +33,15 @@ const MediaMessage = ({ url, type }) => {
     }
 
     if (type === 'AUDIO') {
-        return <audio src={url} controls preload="metadata" onError={() => setFailed(true)} className="max-w-[240px]" />;
+        return (
+            <audio
+                src={url}
+                controls
+                preload="metadata"
+                onError={() => setFailed(true)}
+                className="max-w-[240px]"
+            />
+        );
     }
 
     return null;

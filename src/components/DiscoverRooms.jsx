@@ -3,21 +3,49 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MdArrowBack } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
-import { getPublicRooms, joinChatApi } from '../services/RoomService';
+import useAuth from '../context/AuthContext';
+import {
+  getPublicRooms,
+  joinChatApi,
+} from '../services/RoomService';
 
 const DiscoverRooms = () => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('');
 
-  const { setRoomId, setConnected, setRoomUsers, setIsDm, setDmTarget } = useChatContext();
+  const {
+    setRoomId,
+    setCurrentUser,
+    setConnected,
+    setRoomUsers,
+    setIsDm,
+    setDmTarget,
+  } = useChatContext();
+
+  const auth = useAuth();
   const navigate = useNavigate();
 
+  const currentUserId =
+      auth.user?.id ||
+      auth.user?.subject ||
+      '';
+
   useEffect(() => {
+    if (!auth.authenticated) {
+      return;
+    }
+
     const loadRooms = async () => {
       try {
         setLoading(true);
-        const page = await getPublicRooms(20, 0, sortBy);
+
+        const page = await getPublicRooms(
+            20,
+            0,
+            sortBy
+        );
+
         setRooms(page?.content || []);
       } catch {
         toast.error('Unable to load public rooms.');
@@ -27,16 +55,30 @@ const DiscoverRooms = () => {
     };
 
     loadRooms();
-  }, [sortBy]);
+  }, [auth.authenticated, sortBy]);
 
   const handleJoin = async (roomId) => {
-    try {
-      const room = await joinChatApi(roomId, null);
+    if (!currentUserId) {
+      toast.error('Unable to identify the current user.');
+      return;
+    }
 
-      setRoomUsers(room?.users || []);
+    try {
+      const room = await joinChatApi(
+          roomId,
+          null
+      );
+
+      setCurrentUser(currentUserId);
+
+      // Current members are avlUser.
+      // These values are Mongo IDs.
+      setRoomUsers(room?.avlUser || []);
+
       setIsDm(false);
       setDmTarget('');
-      setRoomId(room?.roomId);
+
+      setRoomId(room?.roomId || roomId);
       setConnected(true);
 
       navigate('/chat');
@@ -53,6 +95,7 @@ const DiscoverRooms = () => {
   return (
       <div className="min-h-screen bg-ink px-6 py-10 text-cream">
         <div className="mx-auto max-w-2xl">
+
           <button
               type="button"
               onClick={() => navigate('/')}
@@ -63,7 +106,9 @@ const DiscoverRooms = () => {
           </button>
 
           <div className="mb-6 flex items-end justify-between">
-            <h1 className="text-xl font-semibold text-cream">Discover public rooms</h1>
+            <h1 className="text-xl font-semibold text-cream">
+              Discover public rooms
+            </h1>
 
             <select
                 value={sortBy}
@@ -85,18 +130,25 @@ const DiscoverRooms = () => {
               </div>
           ) : (
               <div className="overflow-hidden rounded-md border border-border-subtle">
+
                 {rooms.map((room, index) => (
                     <div
                         key={room.roomId}
                         className={`flex items-center justify-between px-5 py-4 transition hover:bg-surface ${
-                            index !== 0 ? 'border-t border-border-subtle' : ''
+                            index !== 0
+                                ? 'border-t border-border-subtle'
+                                : ''
                         }`}
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-mono text-sm text-cream">{room.roomId}</p>
+                        <p className="truncate font-mono text-sm text-cream">
+                          {room.roomId}
+                        </p>
+
                         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                           <span className="h-1.5 w-1.5 rounded-full bg-sage" />
-                          {room.numberAvlUser} active member
+
+                          {room.numberAvlUser} member
                           {room.numberAvlUser === 1 ? '' : 's'}
                         </p>
                       </div>
@@ -110,6 +162,7 @@ const DiscoverRooms = () => {
                       </button>
                     </div>
                 ))}
+
               </div>
           )}
         </div>
