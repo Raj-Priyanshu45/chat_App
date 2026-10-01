@@ -52,7 +52,7 @@ public class SecurityFilter {
                                 .requestMatchers("/swagger-ui/**").permitAll()
                                 .requestMatchers("/api-docs/**").permitAll()
                                 .requestMatchers("/chat/**").permitAll()
-                                .requestMatchers("/auth/register","/auth/login","/auth/refresh-token").permitAll()
+                                .requestMatchers("/auth/register","/auth/login","/auth/refresh-token" , "/auth/verify-email").permitAll()
                                 .requestMatchers("/oauth2/**").permitAll()
                                 .requestMatchers("/login/oauth2/**").permitAll()
                                 .anyRequest().authenticated()

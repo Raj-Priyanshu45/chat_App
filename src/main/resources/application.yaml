@@ -1,12 +1,13 @@
 spring:
+  application:
+    name: chat_app
+
+  mongodb:
+    uri: mongodb://root:root@localhost:27017/chatAppDB?authSource=admin
 
   data:
     mongodb:
       auto-index-creation: true
-
-  application:
-    name: chat_app
-
   mail:
     host: smtp.gmail.com
     port: 587
@@ -38,9 +39,6 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
-
-  mongodb:
-    uri: "${MONGODB_URI:mongodb://root:root@localhost:27017/chatAppDB?authSource=admin}"
 
 
 server:

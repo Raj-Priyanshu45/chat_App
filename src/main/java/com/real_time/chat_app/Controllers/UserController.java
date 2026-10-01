@@ -3,6 +3,7 @@ package com.real_time.chat_app.Controllers;
 import com.real_time.chat_app.DTOs.UserRequest;
 import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Services.UserService;
+import com.real_time.chat_app.anno.ActiveUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ public class UserController {
 
     private final UserService userService;
 
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     @GetMapping("/")
     public ResponseEntity<?> retAllUsers(
             @RequestParam(value = "page" , defaultValue = "0" , required = false) int pageNumber ,

@@ -1,6 +1,7 @@
 package com.real_time.chat_app.Controllers;
 
 import com.real_time.chat_app.Services.ProfileUpdateService;
+import com.real_time.chat_app.anno.ActiveUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +22,7 @@ public class UserProfileController {
     private final ProfileUpdateService profileUpdateService;
 
     @PostMapping("/image")
+    @ActiveUser
     public ResponseEntity<?> updateProfile(@RequestParam MultipartFile file , Principal principal){
         if(profileUpdateService.updateImage(principal.getName(), file)){
             return ResponseEntity.status(201).body("");

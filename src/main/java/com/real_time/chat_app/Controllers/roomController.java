@@ -5,6 +5,7 @@ import com.real_time.chat_app.DTOs.roomId;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Services.roomServices;
+import com.real_time.chat_app.anno.ActiveUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,7 @@ public class roomController {
     private final SimpMessagingTemplate messagingTemplate;
 
     //create rooms
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     @PostMapping("/create")
     public ResponseEntity<?> createRooms(@RequestBody @Valid roomId roomId
                                          ,Principal principal
@@ -50,7 +51,7 @@ public class roomController {
     }
 
 
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     @PostMapping("/join")
     public ResponseEntity<?> getRoom(@RequestBody joinRoom roomInfo
                                      , Principal principal
@@ -66,7 +67,7 @@ public class roomController {
         return ResponseEntity.ok(room);
     }
 
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     @GetMapping("/{roomId}/messages")
     public ResponseEntity<?> getAllMessages(
             @PathVariable String roomId ,
@@ -85,13 +86,13 @@ public class roomController {
 
 
     @GetMapping("/{roomId}/since")
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     public List<Message> reconnectEndpoint(@RequestParam LocalDateTime timestamp , @PathVariable String roomId){
         return roomServices.retMessSince(roomId , timestamp);
     }
 
     @GetMapping("{roomId}/leave")
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     public ResponseEntity<?> leaveRoom(
             @PathVariable String roomId ,
             Principal principal
@@ -111,7 +112,7 @@ public class roomController {
     }
 
     @GetMapping("/{roomId}/members")
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     public ResponseEntity<List<String>> getAllMembers(
             @PathVariable String roomId
     ) {

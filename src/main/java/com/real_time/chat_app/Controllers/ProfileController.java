@@ -3,6 +3,7 @@ package com.real_time.chat_app.Controllers;
 import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Services.ProfileService;
 import com.real_time.chat_app.Services.UserService;
+import com.real_time.chat_app.anno.ActiveUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,12 +22,12 @@ public class ProfileController {
     private final UserService userService;
 
 
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     @GetMapping("/me")
     public ResponseEntity<?> saveOrShowUser(Principal principal){
 
         Users user = userService.saveOrShowUser(principal.getName());
 
-        return ResponseEntity.ok(profileService.retProfileDetails(user.getUsername()));
+        return ResponseEntity.ok(profileService.retProfileDetails(user.getId()));
     }
 }

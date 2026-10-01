@@ -5,6 +5,7 @@ import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Services.DmFileUploadService;
 import com.real_time.chat_app.Services.ImageVideoService;
 import com.real_time.chat_app.Services.chatService;
+import com.real_time.chat_app.anno.ActiveUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -63,7 +64,7 @@ public class chatController {
 
 
     @PostMapping("/upload/{roomId}")
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     public ResponseEntity<?> saveFile(
             @PathVariable String roomId,
             @RequestParam("files") MultipartFile[] files,
@@ -76,7 +77,7 @@ public class chatController {
     }
 
     @PostMapping("/dm/{rec}")
-    @PreAuthorize("hasRole('USER')")
+    @ActiveUser
     public ResponseEntity<?> sendDmFiles(
             @PathVariable String rec,
             @RequestParam("files") MultipartFile[] files,
