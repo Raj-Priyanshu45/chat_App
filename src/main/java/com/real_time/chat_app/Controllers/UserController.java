@@ -1,5 +1,6 @@
 package com.real_time.chat_app.Controllers;
 
+import com.real_time.chat_app.DTOs.UserBrief;
 import com.real_time.chat_app.DTOs.UserRequest;
 import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Services.ProfileService;
@@ -36,5 +37,11 @@ public class UserController {
     @GetMapping("/lookup")
     public ResponseEntity<Map<String, String>> lookup(@RequestParam List<String> ids) {
         return ResponseEntity.ok(profileService.usernamesById(ids));
+    }
+
+    @ActiveUser
+    @GetMapping("/briefs")
+    public ResponseEntity<Map<String, UserBrief>> briefs(@RequestParam List<String> ids) {
+        return ResponseEntity.ok(profileService.briefsById(ids));
     }
 }

@@ -7,6 +7,7 @@ public record ProfileResponse(
         String username,
         String name,
         String gmail,
+        String imageUri ,
         List<String> friends,
         List<String> roomHistory
 ) {}

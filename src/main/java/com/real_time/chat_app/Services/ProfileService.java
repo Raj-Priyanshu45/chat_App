@@ -1,6 +1,7 @@
 package com.real_time.chat_app.Services;
 
 import com.real_time.chat_app.DTOs.ProfileResponse;
+import com.real_time.chat_app.DTOs.UserBrief;
 import com.real_time.chat_app.Models.UserExtras;
 import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Repo.ExtrasRepo;
@@ -41,6 +42,7 @@ public class ProfileService {
                     user.getUsername(),
                     user.getName(),
                     user.getGmail(),
+                    userExtras.getImageUri(),
                     friends,
                     historyOfRooms
             );
@@ -51,6 +53,7 @@ public class ProfileService {
                 user.getUsername(),
                 user.getName(),
                 user.getGmail(),
+                null,
                 Collections.emptyList(),
                 Collections.emptyList()
         );
@@ -64,6 +67,22 @@ public class ProfileService {
                 .collect(Collectors.toMap(
                         Users::getId,
                         Users::getUsername
+                ));
+    }
+
+    public Map<String, UserBrief> briefsById(List<String> ids) {
+
+        List<String> limited = ids.stream().limit(100).toList();
+
+        Map<String, String> images = extraRepo.findByUserIdIn(limited).stream()
+                .filter(e -> e.getImageUri() != null)
+                .collect(Collectors.toMap(UserExtras::getUserId, UserExtras::getImageUri, (a, b) -> a));
+
+        return userRepo.findAllById(limited).stream()
+                .filter(u -> u.getUsername() != null)
+                .collect(Collectors.toMap(
+                        Users::getId,
+                        u -> new UserBrief(u.getUsername(), images.get(u.getId()))
                 ));
     }
 }

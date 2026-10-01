@@ -1,6 +1,8 @@
 package com.real_time.chat_app.Controllers;
 
+import com.real_time.chat_app.DTOs.ForgotPasswordRequest;
 import com.real_time.chat_app.DTOs.LoginFlow;
+import com.real_time.chat_app.DTOs.ResetPasswordRequest;
 import com.real_time.chat_app.DTOs.UserRegistration;
 import com.real_time.chat_app.Models.User_comp_profile;
 import com.real_time.chat_app.Services.AuthService;
@@ -104,5 +106,27 @@ public class AuthController {
         }
 
         return ResponseEntity.status(401).body("Unauthorized");
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request.gmail());
+        // always the same answer, whether the email exists or not
+        return ResponseEntity.ok("If an account exists for that email, a reset link has been sent.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+
+        if (request.newPassword() == null || request.newPassword().length() < 8) {
+            return ResponseEntity.badRequest().body("Password must be at least 8 characters");
+        }
+
+        if (authService.resetPassword(request.token(), request.newPassword())) {
+            return ResponseEntity.ok("Password updated");
+        }
+
+        // 400, not 401: a 401 would trigger the axios refresh-and-retry interceptor
+        return ResponseEntity.badRequest().body("Invalid or expired reset link");
     }
 }

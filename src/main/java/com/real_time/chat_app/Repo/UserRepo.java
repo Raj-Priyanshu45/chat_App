@@ -21,4 +21,9 @@ public interface UserRepo extends MongoRepository<Users , String> {
 
     boolean existsByGmail(String gmail);
 
+    Optional<Users> findByUsernameOrGmail(
+            String username,
+            String gmail
+    );
+
 }

@@ -100,6 +100,8 @@ public class Filter extends OncePerRequestFilter {
         return path.equals("/auth/register")
                 || path.equals("/auth/login")
                 || path.equals("/auth/refresh-token")
+                || path.equals("/auth/forgot-password")
+                || path.equals("/auth/reset-password")
                 || path.startsWith("/oauth2/")
                 || path.equals("/auth/verify-email")
                 || path.startsWith("/login/oauth2/");

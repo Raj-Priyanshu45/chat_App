@@ -24,10 +24,11 @@ public class UserProfileController {
 
     @PostMapping("/image")
     @ActiveUser
-    public ResponseEntity<?> updateProfile(@RequestParam MultipartFile file , Principal principal){
-        if(profileUpdateService.updateImage(principal.getName(), file)){
-            return ResponseEntity.status(201).body("");
+    public ResponseEntity<?> updateProfile(@RequestParam("file") MultipartFile file, Principal principal) {
+        String url = profileUpdateService.updateImage(principal.getName(), file);
+        if (url == null) {
+            return ResponseEntity.internalServerError().build();
         }
-        return ResponseEntity.internalServerError().build();
+        return ResponseEntity.status(201).body(Map.of("imageUri", url));
     }
 }

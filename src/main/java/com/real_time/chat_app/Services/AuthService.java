@@ -84,6 +84,7 @@ public class AuthService {
                         .userId(user.getId())
                         .email(user.getGmail())
                         .token(token)
+                        .type(TokenType.EMAIL_VERIFICATION)
                         .expirationTime(
                                 LocalDateTime.now().plusMinutes(15)
                         )
@@ -110,7 +111,7 @@ public class AuthService {
     ) {
 
         VerificationTokenFlow token =
-                tokenRepo.findByToken(emailToken).orElse(null);
+                tokenRepo.findByTokenAndType(emailToken, TokenType.EMAIL_VERIFICATION).orElse(null);
 
         if (token == null) {
             return false;
@@ -182,6 +183,7 @@ public class AuthService {
                         .userId(userId)
                         .email(users.getGmail())
                         .token(token)
+                        .type(TokenType.EMAIL_VERIFICATION)
                         .expirationTime(
                                 LocalDateTime.now().plusMinutes(15)
                         )
@@ -284,7 +286,7 @@ public class AuthService {
 
     public boolean login(HttpServletResponse response , LoginFlow details) {
 
-        Users user = userRepo.findByUsername(details.username()).orElse(null);
+        Users user = userRepo.findByUsernameOrGmail(details.username() , details.username()).orElse(null);
 
         if(user == null){
             log.info("User not found with username {}",details.username());
@@ -319,6 +321,60 @@ public class AuthService {
         authRepo.save(userAuth);
 
         setCookies.setTokens(response , accessToken , refreshToken);
+        return true;
+    }
+
+
+    public void forgotPassword(String gmail) {
+
+        if (gmail == null || gmail.isBlank()) return;
+
+        Users user = userRepo.findByGmail(gmail.trim()).orElse(null);
+        if (user == null) return;                       // silent: don't reveal who is registered
+
+        UserAuth userAuth = authRepo.findByUserId(user.getId()).orElse(null);
+        if (userAuth == null || userAuth.getPassword() == null) return;  // Google/GitHub-only account
+
+        String rawToken = UUID.randomUUID().toString() + UUID.randomUUID();
+
+        tokenRepo.deleteByUserIdAndType(user.getId(), TokenType.PASSWORD_RESET);
+
+        tokenRepo.save(
+                VerificationTokenFlow.builder()
+                        .userId(user.getId())
+                        .email(user.getGmail())
+                        .token(jwtCreation.hashRefreshToken(rawToken))   // SHA-256, same helper you already have
+                        .type(TokenType.PASSWORD_RESET)
+                        .expirationTime(LocalDateTime.now().plusMinutes(15))
+                        .build()
+        );
+
+        try {
+            mailService.sendPasswordResetEmail(user.getGmail(), rawToken);
+        } catch (Exception e) {
+            log.error("Could not send reset email", e);   // never surface this to the caller
+        }
+    }
+
+    public boolean resetPassword(String rawToken, String newPassword) {
+
+        if (rawToken == null || rawToken.isBlank()) return false;
+
+        VerificationTokenFlow token = tokenRepo
+                .findByTokenAndType(jwtCreation.hashRefreshToken(rawToken.trim()), TokenType.PASSWORD_RESET)
+                .orElse(null);
+
+        if (token == null || !token.getExpirationTime().isAfter(LocalDateTime.now())) return false;
+
+        UserAuth userAuth = authRepo.findByUserId(token.getUserId()).orElse(null);
+        if (userAuth == null) return false;
+
+        userAuth.setPassword(passwordEncoder.encode(newPassword));
+        userAuth.setHashedRefreshToken(null);                        // kill every existing session
+        userAuth.setEmailState(EmailVerificationState.Verified);     // they just proved they own the inbox
+        authRepo.save(userAuth);
+
+        tokenRepo.delete(token);   // single use
         return true;
     }
 }

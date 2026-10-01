@@ -44,13 +44,13 @@ public class ProfileUpdateService {
                     "image/bmp"
             );
 
-    public boolean updateImage(String subject, MultipartFile file) {
+    public String updateImage(String subject, MultipartFile file) {
 
         Users user = userRepo.findById(subject).orElse(null);
 
         if (user == null) {
             log.warn("Unauthorized user changing profile");
-            return false;
+            return null;
         }
 
         UserExtras extras = extraRepo.findByUserId(user.getId()).orElse(null);
@@ -103,13 +103,13 @@ public class ProfileUpdateService {
                             "public_id", publicId
                     );
 
-            Map<?, ?> uploadResult =
-                    cloudinary
-                            .uploader()
-                            .upload(
-                                    file.getBytes(),
-                                    uploadParams
-                            );
+            Map<?, ?> uploadResult;
+            try {
+                uploadResult = cloudinary.uploader().upload(file.getBytes(), uploadParams);
+            } catch (RuntimeException e) {
+                log.error("Cloudinary rejected the upload", e);
+                throw new RuntimeException("Image storage is unavailable right now");
+            }
 
             String fileUrl =
                     (String) uploadResult.get("secure_url");
@@ -121,7 +121,7 @@ public class ProfileUpdateService {
             extras.setImageUri(fileUrl);
             extraRepo.save(extras);
 
-            return true;
+            return fileUrl;
 
         } catch (IOException e) {
 

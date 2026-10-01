@@ -1,7 +1,9 @@
 package com.real_time.chat_app.Models;
 
+import com.real_time.chat_app.enums.TokenType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -24,4 +26,6 @@ public class VerificationTokenFlow {
     private LocalDateTime expirationTime;
 
     private String userId;
+
+    private TokenType type;
 }
