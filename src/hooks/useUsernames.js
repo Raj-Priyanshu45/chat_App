@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { lookupUsernamesApi } from '../services/UserService';
+import { lookupUsernamesApi } from '../services/UserService.js';
 
 // The backend identifies everybody by id (message.sender, room members, friends...).
 // This hook turns ids into usernames: it batches lookups, caches results, and
