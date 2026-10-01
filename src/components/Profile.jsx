@@ -5,6 +5,7 @@ import {
   MdArrowBack,
   MdChatBubbleOutline,
   MdMeetingRoom,
+  MdLogout,
 } from 'react-icons/md';
 
 import useChatContext from '../context/ChatContext';
@@ -35,39 +36,49 @@ const Profile = () => {
   const auth = useAuth();
   const navigate = useNavigate();
 
-  const currentUserId =
-      auth.user?.id ||
-      auth.user?.subject ||
-      '';
+  // Internal ID (never rendered).
+  const currentUserId = auth.user?.id || profile?.id || '';
 
   useEffect(() => {
-    if (!auth.authenticated) {
-      navigate('/');
+    if (!auth.authInitialized) {
       return;
     }
+
+    if (!auth.authenticated) {
+      navigate('/login', { replace: true });
+      return;
+    }
+
+    let cancelled = false;
 
     const loadProfile = async () => {
       try {
         const data = await getMyProfile();
 
+        if (cancelled) return;
+
         setProfile(data);
 
-        // friends remain Mongo IDs internally.
+        // friends are Mongo IDs internally; resolve to usernames for display.
         const friendIds = data?.friends || [];
 
         if (friendIds.length) {
           const names = await getUsernamesByIds(friendIds);
-          setFriendNames(names);
+          if (!cancelled) setFriendNames(names);
         }
       } catch {
-        toast.error('Unable to load profile.');
+        if (!cancelled) toast.error('Unable to load profile.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadProfile();
-  }, [auth.authenticated, navigate]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.authInitialized, auth.authenticated, navigate]);
 
   const handleMessageFriend = (friendId) => {
     if (!currentUserId) {
@@ -93,6 +104,7 @@ const Profile = () => {
         )
     );
 
+    setRoomUsers([]);
     setIsDm(true);
     setConnected(true);
 
@@ -131,6 +143,18 @@ const Profile = () => {
 
       toast.error(message);
     }
+  };
+
+  const handleLogout = async () => {
+    setConnected(false);
+    setRoomId('');
+    setCurrentUser('');
+    setRoomUsers([]);
+    setIsDm(false);
+    setDmTarget('');
+
+    await auth.logout();
+    navigate('/login', { replace: true });
   };
 
   if (loading) {
@@ -187,6 +211,15 @@ const Profile = () => {
                   </p>
               )}
             </div>
+
+            <button
+                type="button"
+                onClick={handleLogout}
+                className="ml-auto flex items-center gap-1.5 rounded-md border border-border-subtle px-3 py-1.5 text-xs text-rose transition hover:border-rose"
+            >
+              <MdLogout size={14} />
+              Log out
+            </button>
           </div>
 
           {/* Friends */}

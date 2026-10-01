@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { MdArrowForward } from 'react-icons/md';
+import { MdArrowForward, MdLogout } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 import {
@@ -28,10 +28,8 @@ const JoinCreateChat = () => {
   const auth = useAuth();
   const navigate = useNavigate();
 
-  const currentUserId =
-      auth.user?.id ||
-      auth.user?.subject ||
-      '';
+  // Internal ID (never rendered).
+  const currentUserId = auth.user?.id || '';
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -40,6 +38,18 @@ const JoinCreateChat = () => {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleLogout = async () => {
+    setConnected(false);
+    setRoomId('');
+    setCurrentUser('');
+    setRoomUsers([]);
+    setIsDm(false);
+    setDmTarget('');
+
+    await auth.logout();
+    navigate('/login', { replace: true });
   };
 
   const validateForm = () => {
@@ -58,7 +68,7 @@ const JoinCreateChat = () => {
 
   const joinChat = async () => {
     if (!auth.authenticated) {
-      await auth.login();
+      navigate('/login');
       return;
     }
 
@@ -108,7 +118,7 @@ const JoinCreateChat = () => {
 
   const createRoom = async () => {
     if (!auth.authenticated) {
-      await auth.login();
+      navigate('/login');
       return;
     }
 
@@ -214,7 +224,7 @@ const JoinCreateChat = () => {
               Enter a room ID to jump straight in.
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <Link
                   to="/discover"
                   className="text-amber transition-colors hover:text-cream"
@@ -228,6 +238,17 @@ const JoinCreateChat = () => {
               >
                 View profile
               </Link>
+
+              {auth.authenticated && (
+                  <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex items-center gap-1 text-rose transition-colors hover:text-cream"
+                  >
+                    <MdLogout size={14} />
+                    Log out
+                  </button>
+              )}
             </div>
 
             {!auth.authInitialized ? (

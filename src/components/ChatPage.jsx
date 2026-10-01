@@ -23,7 +23,7 @@ import {
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 
-import { getWebSocketUrl } from '../config/AxiosHelper';
+import { getWebSocketUrl, ensureFreshSession } from '../config/AxiosHelper';
 
 import {
   getMessages,
@@ -62,7 +62,6 @@ const ChatPage = () => {
 
   const {
     authenticated,
-    token,
     user,
     logout,
   } = useAuth();
@@ -88,11 +87,10 @@ const ChatPage = () => {
     usernamesRef.current = usernamesById;
   }, [usernamesById]);
 
-  // Internal current user ID.
+  // Internal current user ID (never rendered).
   const currentUserId =
-      currentUser ||
       user?.id ||
-      user?.subject ||
+      currentUser ||
       '';
 
   // Visible current username.
@@ -183,10 +181,13 @@ const ChatPage = () => {
           return prev;
         }
 
-        return {
+        const next = {
           ...prev,
           [currentUserId]: currentUsername,
         };
+
+        usernamesRef.current = next;
+        return next;
       });
     }
   }, [
@@ -206,6 +207,15 @@ const ChatPage = () => {
   }, [roomUsers, resolveUsernames]);
 
   /*
+   * Resolve DM target username.
+   */
+  useEffect(() => {
+    if (isDm && dmTarget) {
+      resolveUsernames([dmTarget]);
+    }
+  }, [isDm, dmTarget, resolveUsernames]);
+
+  /*
    * Leave page when disconnected.
    */
   useEffect(() => {
@@ -213,6 +223,17 @@ const ChatPage = () => {
       navigate('/');
     }
   }, [connected, navigate]);
+
+  const scrollToBottom = () => {
+    if (!chatBoxRef.current) {
+      return;
+    }
+
+    chatBoxRef.current.scrollTo({
+      top: chatBoxRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  };
 
   /*
    * Load message history.
@@ -279,25 +300,20 @@ const ChatPage = () => {
   /*
    * STOMP connection.
    *
-   * token is the custom JWT access token.
-   * It must contain the Mongo user ID as JWT subject.
+   * Auth is the httpOnly JWT cookie, sent automatically on the
+   * WebSocket handshake. The JWT subject is the Mongo user ID.
    */
   useEffect(() => {
     if (
         !authenticated ||
         !connected ||
-        !roomId ||
-        !token
+        !roomId
     ) {
       return undefined;
     }
 
     const client = new Client({
       brokerURL: getWebSocketUrl(),
-
-      connectHeaders: {
-        Authorization: `Bearer ${token}`,
-      },
 
       reconnectDelay: 5000,
 
@@ -368,12 +384,23 @@ const ChatPage = () => {
                         ] || 'Unknown user';
 
                 /*
-                 * IMPORTANT:
-                 * Compare IDs, not usernames.
+                 * The DM is "this one" if the other participant
+                 * (sender if not me, otherwise the dm target)
+                 * matches the DM we're viewing. Compare IDs.
                  */
+                const otherId =
+                    senderId === currentUserId
+                        ? dmTargetRef.current
+                        : senderId;
+
                 const viewingThisDm =
                     isDmRef.current &&
-                    dmTargetRef.current === senderId;
+                    dmTargetRef.current === otherId &&
+                    payload.roomId ===
+                    computeDmRoomId(
+                        currentUserId,
+                        dmTargetRef.current
+                    );
 
                 if (viewingThisDm) {
                   setMessages((prev) => [
@@ -385,7 +412,7 @@ const ChatPage = () => {
                       payload.timeStamp;
 
                   scrollToBottom();
-                } else {
+                } else if (senderId !== currentUserId) {
                   toast.custom((t) => (
                       <div
                           onClick={() => {
@@ -533,7 +560,7 @@ const ChatPage = () => {
                   scrollToBottom();
                 })
                 .catch(() => {
-                  if (!isDm) {
+                  if (!isDmRef.current) {
                     toast.error(
                         'Unable to fetch missed messages.'
                     );
@@ -545,6 +572,7 @@ const ChatPage = () => {
 
       onStompError: (frame) => {
         toast.error(
+            frame.headers?.message ||
             frame.body ||
             'WebSocket error.'
         );
@@ -561,9 +589,19 @@ const ChatPage = () => {
       },
     });
 
-    client.activate();
+    // The cookie is only checked at handshake time, so make sure it's fresh first.
+    let cancelled = false;
+
+    ensureFreshSession()
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) {
+            client.activate();
+          }
+        });
 
     return () => {
+      cancelled = true;
       client.deactivate();
       setStompClient(null);
     };
@@ -571,8 +609,6 @@ const ChatPage = () => {
     authenticated,
     connected,
     roomId,
-    token,
-    navigate,
     isDm,
     currentUserId,
     resolveUsernames,
@@ -586,26 +622,8 @@ const ChatPage = () => {
    * Scroll.
    */
   useEffect(() => {
-    if (!chatBoxRef.current) {
-      return;
-    }
-
-    chatBoxRef.current.scrollTo({
-      top: chatBoxRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
+    scrollToBottom();
   }, [messages]);
-
-  const scrollToBottom = () => {
-    if (!chatBoxRef.current) {
-      return;
-    }
-
-    chatBoxRef.current.scrollTo({
-      top: chatBoxRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
-  };
 
   /*
    * Send message.
@@ -723,8 +741,8 @@ const ChatPage = () => {
     setIsDm(false);
     setDmTarget('');
 
-    logout();
-    navigate('/');
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   /*
@@ -953,15 +971,25 @@ const ChatPage = () => {
                   : `#${roomId}`}
             </p>
 
-            <button
-                type="button"
-                onClick={handleLeaveRoom}
-                className="rounded-md px-3 py-1.5 text-xs text-muted transition hover:text-cream sm:hidden"
-            >
-              {isDm
-                  ? 'Close'
-                  : 'Leave'}
-            </button>
+            <div className="flex items-center gap-1 sm:hidden">
+              <button
+                  type="button"
+                  onClick={handleLeaveRoom}
+                  className="rounded-md px-3 py-1.5 text-xs text-muted transition hover:text-cream"
+              >
+                {isDm
+                    ? 'Close'
+                    : 'Leave'}
+              </button>
+
+              <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-md px-3 py-1.5 text-xs text-rose transition hover:text-cream"
+              >
+                Logout
+              </button>
+            </div>
 
           </header>
 
@@ -1021,7 +1049,7 @@ const ChatPage = () => {
                               message.type === 'AUDIO' ? (
                                   <div className="mt-1.5">
                                     <MediaMessage
-                                        filename={
+                                        url={
                                           message.content
                                         }
                                         type={
