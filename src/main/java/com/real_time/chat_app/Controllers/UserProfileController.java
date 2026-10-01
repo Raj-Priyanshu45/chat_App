@@ -30,11 +30,4 @@ public class UserProfileController {
         }
         return ResponseEntity.internalServerError().build();
     }
-
-    @GetMapping("/lookup")
-    public ResponseEntity<Map<String, String>> lookup(
-            @RequestParam List<String> ids
-    ) {
-        return ResponseEntity.ok(profileService.usernamesById(ids));
-    }
 }

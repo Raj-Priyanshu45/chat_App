@@ -9,10 +9,7 @@ import com.real_time.chat_app.Repo.roomRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,17 +32,12 @@ public class ProfileService {
 
         if (userExtras != null) {
 
-            List<String> friends = userExtras.getFriends()
-                    .stream()
-                    .map(id -> userRepo.findById(id)
-                            .map(Users::getUsername)
-                            .orElse(null))
-                    .filter(Objects::nonNull)
-                    .toList();
+            List<String> friends = new ArrayList<>(userExtras.getFriends());
 
             List<String> historyOfRooms = userExtras.getRoomId().stream().toList();
 
             return new ProfileResponse(
+                    user.getId(),
                     user.getUsername(),
                     user.getName(),
                     user.getGmail(),
@@ -55,6 +47,7 @@ public class ProfileService {
         }
 
         return new ProfileResponse(
+                user.getId(),
                 user.getUsername(),
                 user.getName(),
                 user.getGmail(),
@@ -65,8 +58,9 @@ public class ProfileService {
 
     public Map<String, String> usernamesById(List<String> ids) {
 
-        return userRepo.findAllById(ids)
+        return userRepo.findAllById(ids.stream().limit(100).toList())
                 .stream()
+                .filter(u -> u.getUsername() != null)
                 .collect(Collectors.toMap(
                         Users::getId,
                         Users::getUsername
