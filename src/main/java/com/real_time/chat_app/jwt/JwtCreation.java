@@ -108,5 +108,13 @@ public class JwtCreation {
                 .getPayload();
     }
 
-
+    public String generateWsTicket(String userId) {
+        return Jwts.builder()
+                .subject(userId)
+                .claim("type", "ws")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 30_000))
+                .signWith(secretKey)
+                .compact();
+    }
 }
