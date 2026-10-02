@@ -16,4 +16,4 @@ COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 9000
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+UseSerialGC", "-jar", "app.jar"]
