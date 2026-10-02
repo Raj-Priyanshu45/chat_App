@@ -17,3 +17,7 @@ export const uploadProfileImageApi = async (file) => {
   });
   return response.data;
 };
+export const fetchWsTicketApi = async () => {
+  const response = await httpClient.get('/api/v1/ws-ticket');
+  return response.data.ticket;
+};

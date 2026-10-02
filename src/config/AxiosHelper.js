@@ -79,6 +79,5 @@ httpClient.interceptors.response.use(
     }
 );
 
-export const getWebSocketUrl = () => {
-    return 'wss://chatcom-gzat.onrender.com/chat';
-};
+export const getWebSocketUrl = () =>
+    import.meta.env.VITE_WS_URL || 'wss://chatcom-gzat.onrender.com/chat';
