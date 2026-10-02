@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { fetchWsTicketApi } from '../services/ProfileService';
 import Avatar from './Avatar';
 import { useAvatars } from '../hooks/useAvatars';
 import { useNavigate } from 'react-router-dom';
@@ -318,8 +319,13 @@ const ChatPage = () => {
       return undefined;
     }
 
-    const client = new Client({
+    cconst client = new Client({
       brokerURL: getWebSocketUrl(),
+
+      beforeConnect: async (stompClient) => {
+        const ticket = await fetchWsTicketApi();
+        stompClient.brokerURL = `${getWebSocketUrl()}?ticket=${ticket}`;
+      },
 
       reconnectDelay: 5000,
 
