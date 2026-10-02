@@ -319,7 +319,7 @@ const ChatPage = () => {
       return undefined;
     }
 
-    cconst client = new Client({
+    const client = new Client({
       brokerURL: getWebSocketUrl(),
 
       beforeConnect: async (stompClient) => {
