@@ -29,6 +29,7 @@ spring:
           google:
             client-id: "${GOOGLE_CLIENT_ID:not-set}"
             client-secret: "${GOOGLE_CLIENT_SECRET:not-set}"
+            redirect-uri: "${FRONTEND:http://localhost:3000}/login/oauth2/code/google"
 
 
   servlet:
