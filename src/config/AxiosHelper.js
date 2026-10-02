@@ -1,13 +1,10 @@
 import axios from 'axios';
 
-export const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
-
-// The JWT lives in an httpOnly cookie, so the browser attaches it by itself.
-// withCredentials is what makes axios send/accept cookies on cross-port requests.
+export const baseURL = import.meta.env.VITE_API_BASE_URL ?? '';
 export const httpClient = axios.create({
-  baseURL,
-  withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
+    baseURL,
+    withCredentials: true,
+    headers: { 'Content-Type': 'application/json' },
 });
 
 /* ---------- session handling ---------- */
@@ -83,8 +80,5 @@ httpClient.interceptors.response.use(
 );
 
 export const getWebSocketUrl = () => {
-  const url = new URL(baseURL);
-  url.protocol = url.protocol.replace(/^http/, 'ws');
-  url.pathname = '/chat';
-  return url.toString();
+    return 'wss://chatcom-gzat.onrender.com/chat';
 };

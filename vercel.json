@@ -1,3 +1,10 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://chatcom-gzat.onrender.com/api/:path*" },
+    { "source": "/auth/:path*", "destination": "https://chatcom-gzat.onrender.com/auth/:path*" },
+    { "source": "/update/:path*", "destination": "https://chatcom-gzat.onrender.com/update/:path*" },
+    { "source": "/oauth2/:path*", "destination": "https://chatcom-gzat.onrender.com/oauth2/:path*" },
+    { "source": "/login/oauth2/:path*", "destination": "https://chatcom-gzat.onrender.com/login/oauth2/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
