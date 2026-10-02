@@ -15,9 +15,13 @@ public class mailService {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    @Value("${app.mail-from}")
+    private String from;
+
     public void sendVerificationEmail(String to , String token){
 
         SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
         message.setTo(to);
         message.setSubject("Verify your email");
         message.setText(
@@ -29,10 +33,9 @@ public class mailService {
         mailSender.send(message);
     }
 
-
-
     public void sendPasswordResetEmail(String to, String rawToken) {
         SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
         message.setTo(to);
         message.setSubject("Reset your password");
         message.setText(

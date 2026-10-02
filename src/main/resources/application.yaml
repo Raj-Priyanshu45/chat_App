@@ -66,3 +66,6 @@ cookie:
 
 app:
   frontend-url: "${FRONTEND:http://localhost:3000}"
+
+
+  mail-from: "${mail-from}"
