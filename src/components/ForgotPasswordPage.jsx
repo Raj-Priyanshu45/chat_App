@@ -31,13 +31,20 @@ const ForgotPasswordPage = () => {
             title="Reset your password"
             subtitle={
                 sent
-                    ? 'If an account exists for that email, a reset link is on its way. It expires in 15 minutes.'
-                    : "Enter your email and we'll send you a reset link."
+                    ? 'If an account exists for that email, a reset token is on its way. It expires in 15 minutes.'
+                    : "Enter your email and we'll send you a reset token."
             }
             footer={
-                <Link to="/login" className="text-amber transition-colors hover:text-cream">
-                    Back to log in
-                </Link>
+                <div className="flex gap-4">
+                    {sent && (
+                        <Link to="/reset-password" className="text-amber transition-colors hover:text-cream">
+                            I have my token
+                        </Link>
+                    )}
+                    <Link to="/login" className="text-amber transition-colors hover:text-cream">
+                        Back to log in
+                    </Link>
+                </div>
             }
         >
             {!sent && (
@@ -55,7 +62,7 @@ const ForgotPasswordPage = () => {
                         disabled={busy}
                         className="mt-8 w-full rounded-md bg-amber px-4 py-3 text-sm font-semibold text-ink transition hover:bg-amber-dim disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                        {busy ? 'Sending…' : 'Send reset link'}
+                        {busy ? 'Sending…' : 'Send reset token'}
                     </button>
                 </form>
             )}

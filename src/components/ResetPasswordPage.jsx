@@ -4,10 +4,16 @@ import toast from 'react-hot-toast';
 import { resetPasswordApi } from '../services/AuthService';
 import { AuthShell, Field } from './AuthShell';
 
+// Works two ways:
+//   1. a link  /reset-password?token=TOKEN  -> token is prefilled
+//   2. the email contains just the token -> user pastes it here
 const ResetPasswordPage = () => {
     const [params] = useSearchParams();
-    const token = params.get('token');
-    const [form, setForm] = useState({ password: '', confirm: '' });
+    const [form, setForm] = useState({
+        token: params.get('token') || '',
+        password: '',
+        confirm: '',
+    });
     const [busy, setBusy] = useState(false);
     const navigate = useNavigate();
 
@@ -19,6 +25,10 @@ const ResetPasswordPage = () => {
     const handleSubmit = async (event) => {
         event.preventDefault();
 
+        if (!form.token.trim()) {
+            toast.error('Enter the reset token from your email.');
+            return;
+        }
         if (form.password.length < 8) {
             toast.error('Password must be at least 8 characters.');
             return;
@@ -30,7 +40,7 @@ const ResetPasswordPage = () => {
 
         setBusy(true);
         try {
-            await resetPasswordApi(token, form.password);
+            await resetPasswordApi(form.token.trim(), form.password);
             toast.success('Password updated. Log in with your new password.');
             navigate('/login', { replace: true });
         } catch (error) {
@@ -41,23 +51,18 @@ const ResetPasswordPage = () => {
         }
     };
 
-    if (!token) {
-        return (
-            <AuthShell
-                title="Invalid link"
-                subtitle="This reset link is missing its token."
-                footer={
-                    <Link to="/forgot-password" className="text-amber transition-colors hover:text-cream">
-                        Request a new link
-                    </Link>
-                }
-            />
-        );
-    }
-
     return (
-        <AuthShell title="Choose a new password" subtitle="You'll be asked to log in again afterwards.">
+        <AuthShell
+            title="Choose a new password"
+            subtitle="Paste the token from your email. You'll be asked to log in again afterwards."
+            footer={
+                <Link to="/forgot-password" className="text-amber transition-colors hover:text-cream">
+                    Request a new token
+                </Link>
+            }
+        >
             <form onSubmit={handleSubmit}>
+                <Field label="Token" name="token" value={form.token} onChange={handleChange} />
                 <Field
                     label="New password"
                     name="password"
