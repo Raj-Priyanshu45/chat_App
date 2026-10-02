@@ -40,8 +40,10 @@ public class mailService {
         message.setSubject("Reset your password");
         message.setText(
                 "We received a request to reset your password.\n\n" +
-                        "Open this link to choose a new one (valid for 15 minutes):\n" +
-                        frontendUrl + "/reset-password?token=" + rawToken + "\n\n" +
+                        "Your reset token (valid for 15 minutes):\n\n" +
+                        rawToken + "\n\n" +
+                        "Paste it on this page to choose a new password:\n" +
+                        frontendUrl + "/reset-password\n\n" +
                         "If you didn't request this, you can ignore this email."
         );
         mailSender.send(message);
