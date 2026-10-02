@@ -3,8 +3,7 @@ spring:
     name: chat_app
 
   mongodb:
-    uri: mongodb://root:root@localhost:27017/chatAppDB?authSource=admin
-
+    uri: "${MONGODB_URI}"
   data:
     mongodb:
       auto-index-creation: true
@@ -28,16 +27,10 @@ spring:
             client-id: "${GOOGLE_CLIENT_ID:not-set}"
             client-secret: "${GOOGLE_CLIENT_SECRET:not-set}"
 
-          github:
-            client-id: "${GITHUB_CLIENT_ID:not-set}"
-            client-secret: "${GITHUB_CLIENT_SECRET:not-set}"
-            scope:
-              - read:user
-              - user:email
 
   servlet:
     multipart:
-      max-file-size: 5MB
+      max-file-size: 20MB
       max-request-size: 10MB
 
 

@@ -9,6 +9,7 @@ import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -26,12 +27,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
-
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic", "/queue");
-        config.setApplicationDestinationPrefixes("/app");
-    }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -67,5 +62,20 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
         registration.interceptors(channelInterceptor);
+    }
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("ws-heartbeat-");
+        scheduler.initialize();
+
+        config.enableSimpleBroker("/topic", "/queue")
+                .setHeartbeatValue(new long[]{10000, 10000})
+                .setTaskScheduler(scheduler);
+
+        config.setApplicationDestinationPrefixes("/app");
     }
 }

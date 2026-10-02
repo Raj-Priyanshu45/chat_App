@@ -24,7 +24,7 @@ public class SetCookies {
                 .secure(secure)
                 .path("/")
                 .maxAge(Duration.ofMillis(expiration))
-                .sameSite(secure ? "None" : "Lax")
+                .sameSite("None")
                 .build();
 
         ResponseCookie refresh = ResponseCookie.from("REFRESH", refreshToken)
@@ -32,7 +32,7 @@ public class SetCookies {
                 .secure(secure)
                 .path("/auth/")
                 .maxAge(Duration.ofDays(7))
-                .sameSite(secure ? "None" : "Lax")
+                .sameSite("None")
                 .build();
 
         response.addHeader("Set-Cookie", access.toString());
@@ -49,7 +49,7 @@ public class SetCookies {
                 .secure(secure)
                 .path("/")
                 .maxAge(Duration.ofMinutes(10))
-                .sameSite(secure ? "None" : "Lax")
+                .sameSite("None")
                 .build();
 
         response.addHeader(
@@ -66,7 +66,7 @@ public class SetCookies {
                 .secure(secure)
                 .path("/")
                 .maxAge(0)
-                .sameSite(secure ? "None" : "Lax")
+                .sameSite("None")
                 .build();
 
         ResponseCookie refresh = ResponseCookie
@@ -75,7 +75,7 @@ public class SetCookies {
                 .secure(secure)
                 .path("/auth/")
                 .maxAge(0)
-                .sameSite(secure ? "None" : "Lax")
+                .sameSite("None")
                 .build();
 
         response.addHeader("Set-Cookie", access.toString());
