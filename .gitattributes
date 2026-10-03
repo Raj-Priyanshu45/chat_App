@@ -1,2 +1,11 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+# Documentation / architecture notes
+STOMP linguist-documentation
+SimpleBroker linguist-documentation
+SimpMessagingTemplate linguist-documentation
+URIs linguist-documentation
+WebSocket linguist-documentation
+flow linguist-documentation
+notes linguist-documentation
+Public_Vs_Private_domain linguist-documentation
