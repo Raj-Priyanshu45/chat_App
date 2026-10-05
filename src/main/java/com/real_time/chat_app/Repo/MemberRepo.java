@@ -14,4 +14,6 @@ public interface MemberRepo extends MongoRepository<RoomMember , String> {
     Optional<RoomMember> findByUserIdAndRoomId(String userId , String roomId);
 
     List<RoomMember> findByRoomIdAndLeftAtIsNull(String roomId);
+
+    boolean existsByRoomIdAndUserIdAndLeftAtIsNull(String roomId , String userId);
 }
