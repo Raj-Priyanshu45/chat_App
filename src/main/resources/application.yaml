@@ -70,3 +70,7 @@ app:
 
 
   mail-from: "${mail-from}"
+
+logging:
+  level:
+    org.springframework.security: DEBUG
