@@ -38,6 +38,7 @@ import {
   uploadFileApi,
   uploadDmFileApi,
   computeDmRoomId,
+  getRoomMembersApi,
 } from '../services/RoomService';
 
 import { lookupUsernamesApi } from '../services/UserService';
@@ -108,6 +109,7 @@ const ChatPage = () => {
   const [input, setInput] = useState('');
   const [stompClient, setStompClient] = useState(null);
   const [showMembers, setShowMembers] = useState(false);
+  const [memberIds, setMemberIds] = useState([]);
 
   // Inline edit state
   const [editingId, setEditingId] = useState(null);
@@ -129,6 +131,7 @@ const ChatPage = () => {
   const avatarOf = useAvatars(
       messages.map((message) => message.sender)
   );
+  const memberAvatarOf = useAvatars(memberIds);
 
   // Keep username map available inside WebSocket callbacks.
   useEffect(() => {
@@ -962,24 +965,29 @@ const ChatPage = () => {
    *   username: visible username
    * }
    */
-  const memberViewModels = useMemo(() => {
-    return (roomUsers || [])
-        .filter(
-            (id) =>
-                id &&
-                id !== currentUserId
-        )
-        .map((id) => ({
-          id,
-          username:
-              usernamesById[id] ||
-              'Unknown user',
-        }));
-  }, [
-    roomUsers,
-    currentUserId,
-    usernamesById,
-  ]);
+  /*
+ * Members: the backend returns Mongo IDs only.
+ * Fetch them, resolve to usernames via /users/lookup, then open the modal.
+ */
+  const openMembers = async () => {
+    try {
+      const ids = await getRoomMembersApi(roomId);
+
+      setMemberIds(ids);
+      await resolveUsernames(ids);
+
+      setShowMembers(true);
+    } catch {
+      toast.error('Unable to load members.');
+    }
+  };
+  const memberViewModels = memberIds
+      .filter((id) => id && id !== currentUserId)
+      .map((id) => ({
+        id,
+        username: usernamesById[id] || 'Unknown user',
+        imageUri: memberAvatarOf(id),
+      }));
 
   /*
    * Visible DM username.
@@ -1049,9 +1057,7 @@ const ChatPage = () => {
             {!isDm && (
                 <button
                     type="button"
-                    onClick={() =>
-                        setShowMembers(true)
-                    }
+                    onClick={openMembers}
                     className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted transition hover:bg-surface-raised hover:text-cream"
                 >
                   <MdGroup size={17} />
