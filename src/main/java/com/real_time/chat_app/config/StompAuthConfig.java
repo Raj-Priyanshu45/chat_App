@@ -12,6 +12,7 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
+import com.real_time.chat_app.Repo.MemberRepo;
 
 import java.security.Principal;
 
@@ -23,6 +24,7 @@ public class StompAuthConfig implements ChannelInterceptor {
     private static final String SEND_PREFIX = "/app/sendMessages/";
 
     private final roomRepo roomRepo;
+    private final MemberRepo memberRepo;
 
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
@@ -48,13 +50,9 @@ public class StompAuthConfig implements ChannelInterceptor {
 
                 String roomId = roomIdFrom(accessor.getDestination());
 
-                if (roomId != null) {
-                    Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
-
-                    // principal name = user id (set by your JWT Filter)
-                    if (room == null || !room.getAvlUser().contains(user.getName())) {
-                        throw new MessageDeliveryException("Not a member of this room");
-                    }
+                if (roomId != null
+                        && !memberRepo.existsByRoomIdAndUserIdAndLeftAtIsNull(roomId, user.getName())) {
+                    throw new MessageDeliveryException("Not a member of this room");
                 }
             }
         }
