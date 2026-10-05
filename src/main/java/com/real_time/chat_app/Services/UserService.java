@@ -42,7 +42,7 @@ public class UserService {
         List<RoomMember> allUsers = memberRepo.findByRoomIdAndLeftAtIsNull(roomId);
 
         List<String> mem = allUsers.stream()
-                .map(RoomMember::getId).toList();
+                .map(RoomMember::getUserId).toList();
 
         return new PageImpl<>(mem);
     }
