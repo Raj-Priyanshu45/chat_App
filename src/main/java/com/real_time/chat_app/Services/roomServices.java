@@ -100,9 +100,10 @@ public class roomServices {
 //            repo.save(room);
 //        }
 
-        if(memberRepo.existsByRoomIdAndUserId(roomInfo.roomId(), userId)){
+        RoomMember member = memberRepo.findByUserIdAndRoomId(userId , roomInfo.roomnId()).orElse(null);
 
-            RoomMember member = RoomMember.builder()
+        if(member == null){
+            member = RoomMember.builder()
                     .joinedAt(LocalDateTime.now())
                     .roomId(roomInfo.roomId())
                     .leftAt(null)
@@ -111,7 +112,15 @@ public class roomServices {
                     .build();
 
             memberRepo.save(member);
+        } 
+
+        else if (member.getLeftAt() != null){
+
+            member.setLeftAt(null);
+            member.setJoinedAt(LocalDateTime.now());
         }
+
+        memberRepo.save(member);
 
         return room;
     }
