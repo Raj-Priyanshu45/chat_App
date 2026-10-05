@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.UUID;
 
 import static com.real_time.chat_app.enums.EmailVerificationState.Not_Verified;
+import static com.real_time.chat_app.enums.EmailVerificationState.Verified;
 
 @Component
 @RequiredArgsConstructor
@@ -90,7 +91,7 @@ public class JwtCreation {
                 .subject(users.getId())
                 .claim("role", users.getRole().name())
                 .claim("state", users.getState().name())
-                .claim("email_verified", Not_Verified)
+                .claim("email_verified", Verified)
                 .issuedAt(new Date())
                 .expiration(
                         new Date(

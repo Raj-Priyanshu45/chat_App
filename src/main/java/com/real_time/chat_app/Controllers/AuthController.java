@@ -68,7 +68,7 @@ public class AuthController {
     }
 
     @PostMapping("/comp-profile")
-    @EmailVer
+    @PreAuth
     public ResponseEntity<?> completeProfile(Principal principal , HttpServletResponse response
                                              , @RequestBody User_comp_profile userProfile
     ){
