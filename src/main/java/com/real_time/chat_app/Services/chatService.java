@@ -133,6 +133,8 @@ public class chatService {
 
         Message message = new Message(room.getRoomId(), user.getId(), request.message());
 
+        Message saved = messRepo.save(message);
+
         messagingTemplate.convertAndSendToUser(
                 user1,
                 "/queue/dm",
@@ -145,7 +147,7 @@ public class chatService {
                 message
         );
 
-        return messRepo.save(message);
+        return saved;
     }
 
     private String getDmRoomId(String user1, String user2) {

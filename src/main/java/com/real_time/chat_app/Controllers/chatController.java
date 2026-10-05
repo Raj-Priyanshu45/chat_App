@@ -116,13 +116,11 @@ public class chatController {
 
 
     @MessageMapping("chat/del")
-    @ActiveUser
     public void delMessage(MessDelRequest req , Principal principal){
         messDelService.delMessage(principal.getName(), req.messId() , req.roomId());
     }
 
     @MessageMapping("chat/edit")
-    @ActiveUser
     public void editMessage(MessEditRequest request , Principal principal){
         messDelService.editMessage(principal.getName(), request.messId() , request.updatedContent(), request.roomId());
     }
