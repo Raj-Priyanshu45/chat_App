@@ -20,6 +20,10 @@ import {
   MdLogout,
   MdPerson,
   MdExplore,
+  MdEdit,
+  MdDelete,
+  MdCheck,
+  MdClose,
 } from 'react-icons/md';
 
 import useChatContext from '../context/ChatContext';
@@ -45,6 +49,38 @@ import {
 
 import MediaMessage from './MediaMessage';
 import MembersModal from './MembersModal';
+
+/*
+ * Edit / delete events arrive on the same channels as normal messages
+ * (/topic/room/{id} for rooms, /user/queue/dm for DMs).
+ * They carry type = MESSAGE_EDITED / MESSAGE_DELETED.
+ * Returns true when the payload was an event (and has been applied).
+ */
+const applyMessageEvent = (payload, setMessages) => {
+  if (payload?.type === 'MESSAGE_DELETED') {
+    setMessages((prev) =>
+        prev.filter((m) => m.id !== payload.messageId)
+    );
+    return true;
+  }
+
+  if (payload?.type === 'MESSAGE_EDITED') {
+    setMessages((prev) =>
+        prev.map((m) =>
+            m.id === payload.messageId
+                ? {
+                  ...m,
+                  content: payload.updatedContent,
+                  edited: true,
+                }
+                : m
+        )
+    );
+    return true;
+  }
+
+  return false;
+};
 
 const ChatPage = () => {
   const {
@@ -73,12 +109,17 @@ const ChatPage = () => {
   const [stompClient, setStompClient] = useState(null);
   const [showMembers, setShowMembers] = useState(false);
 
+  // Inline edit state
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+
   // Internal ID -> visible username
   const [usernamesById, setUsernamesById] = useState({});
 
   const chatBoxRef = useRef(null);
   const fileInputRef = useRef(null);
   const lastMessageTimestampRef = useRef(null);
+  const prevLengthRef = useRef(0);
 
   const usernamesRef = useRef({});
 
@@ -231,6 +272,14 @@ const ChatPage = () => {
     }
   }, [connected, navigate]);
 
+  /*
+   * Switching room / DM cancels any open edit.
+   */
+  useEffect(() => {
+    setEditingId(null);
+    setEditText('');
+  }, [roomId]);
+
   const scrollToBottom = () => {
     if (!chatBoxRef.current) {
       return;
@@ -347,6 +396,11 @@ const ChatPage = () => {
                   const payload =
                       JSON.parse(message.body);
 
+                  // edit / delete events
+                  if (applyMessageEvent(payload, setMessages)) {
+                    return;
+                  }
+
                   if (payload.sender) {
                     await resolveUsernames([
                       payload.sender,
@@ -380,6 +434,21 @@ const ChatPage = () => {
               try {
                 const payload =
                     JSON.parse(message.body);
+
+                // edit / delete events
+                if (payload?.type === 'MESSAGE_DELETED' || payload?.type === 'MESSAGE_EDITED') {
+                  if (
+                      isDmRef.current &&
+                      payload.roomId ===
+                      computeDmRoomId(
+                          currentUserId,
+                          dmTargetRef.current
+                      )
+                  ) {
+                    applyMessageEvent(payload, setMessages);
+                  }
+                  return;
+                }
 
                 const senderId =
                     payload.sender;
@@ -631,11 +700,15 @@ const ChatPage = () => {
   ]);
 
   /*
-   * Scroll.
+   * Scroll only when a message is ADDED
+   * (edits and deletes must not jump the view).
    */
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > prevLengthRef.current) {
+      scrollToBottom();
+    }
+    prevLengthRef.current = messages.length;
+  }, [messages.length]);
 
   /*
    * Send message.
@@ -669,6 +742,86 @@ const ChatPage = () => {
     } catch (error) {
       toast.error(
           `Failed to send message: ${error.message}`
+      );
+    }
+  };
+
+  /*
+   * Edit message (inline).
+   */
+  const startEdit = (message) => {
+    setEditingId(message.realId);
+    setEditText(message.content || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const submitEdit = () => {
+    if (!stompClient || !connected || !editingId) {
+      return;
+    }
+
+    const text = editText.trim();
+
+    if (!text) {
+      toast.error('Message cannot be empty.');
+      return;
+    }
+
+    const original = messages.find(
+        (m) => m.id === editingId
+    );
+
+    // Nothing changed.
+    if (original && original.content === text) {
+      cancelEdit();
+      return;
+    }
+
+    try {
+      stompClient.publish({
+        destination: '/app/chat/edit',
+        body: JSON.stringify({
+          roomId,
+          messId: editingId,
+          updatedContent: text,
+        }),
+      });
+
+      cancelEdit();
+    } catch (error) {
+      toast.error(
+          `Failed to edit message: ${error.message}`
+      );
+    }
+  };
+
+  /*
+   * Delete message.
+   */
+  const deleteMessage = (message) => {
+    if (!stompClient || !connected || !message.realId) {
+      return;
+    }
+
+    if (!window.confirm('Delete this message?')) {
+      return;
+    }
+
+    try {
+      stompClient.publish({
+        destination: '/app/chat/del',
+        body: JSON.stringify({
+          messId: message.realId,
+          roomId,
+        }),
+      });
+    } catch (error) {
+      toast.error(
+          `Failed to delete message: ${error.message}`
       );
     }
   };
@@ -837,11 +990,15 @@ const ChatPage = () => {
 
   /*
    * Visible message data.
+   * realId = the server id (undefined if the message has none yet),
+   * used for edit / delete.
    */
   const groupedMessages = useMemo(() => {
     return messages.map(
         (message, index) => ({
           ...message,
+
+          realId: message.id,
 
           id:
               message.id ||
@@ -1020,66 +1177,166 @@ const ChatPage = () => {
                 <div className="mx-auto flex max-w-3xl flex-col">
 
                   {groupedMessages.map(
-                      (message) => (
-                          <div
-                              key={message.id}
-                              className="group flex gap-3 rounded-md px-2 py-2 transition hover:bg-surface/50"
+                      (message) => {
+                        const isOwn =
+                            message.sender ===
+                            currentUserId;
+
+                        const isTextMessage =
+                            !message.type ||
+                            message.type === 'TEXT';
+
+                        const isEditing =
+                            editingId !== null &&
+                            editingId === message.realId;
+
+                        const canModify =
+                            isOwn &&
+                            Boolean(message.realId) &&
+                            !isEditing;
+
+                        return (
+                            <div
+                                key={message.id}
+                                className="group relative flex gap-3 rounded-md px-2 py-2 transition hover:bg-surface/50"
+                            >
+
+                              {/* Avatar */}
+                              <div className="mt-0.5">
+                                <Avatar
+                                    src={avatarOf(message.sender)}
+                                    name={message.displaySender}
+                                    size={32}
+                                />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+
+                                <div className="flex items-baseline gap-2">
+
+                          <span
+                              className={`font-mono text-sm font-medium ${
+                                  isOwn
+                                      ? 'text-amber'
+                                      : 'text-cream'
+                              }`}
                           >
+                            {message.displaySender}
+                          </span>
 
-                            {/* Avatar */}
-                            <div className="mt-0.5">
-                              <Avatar
-                                  src={avatarOf(message.sender)}
-                                  name={message.displaySender}
-                                  size={32}
-                              />
-                            </div>
+                                  <span className="font-mono text-[11px] text-muted">
+                            {formatTime(
+                                message.timeStamp
+                            )}
+                          </span>
 
-                            <div className="min-w-0 flex-1">
+                                  {message.edited && (
+                                      <span className="text-[11px] text-muted">
+                              (edited)
+                            </span>
+                                  )}
 
-                              <div className="flex items-baseline gap-2">
+                                </div>
 
-                        <span
-                            className={`font-mono text-sm font-medium ${
-                                message.sender ===
-                                currentUserId
-                                    ? 'text-amber'
-                                    : 'text-cream'
-                            }`}
-                        >
-                          {message.displaySender}
-                        </span>
+                                {isEditing ? (
+                                    <div className="mt-1">
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                            autoFocus
+                                            value={editText}
+                                            onChange={(event) =>
+                                                setEditText(
+                                                    event.target.value
+                                                )
+                                            }
+                                            onKeyDown={(event) => {
+                                              if (event.key === 'Enter') {
+                                                event.preventDefault();
+                                                submitEdit();
+                                              } else if (event.key === 'Escape') {
+                                                cancelEdit();
+                                              }
+                                            }}
+                                            className="flex-1 rounded-md border border-amber bg-surface px-3 py-1.5 text-sm text-cream outline-none"
+                                        />
 
-                                <span className="font-mono text-[11px] text-muted">
-                          {formatTime(
-                              message.timeStamp
-                          )}
-                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={submitEdit}
+                                            title="Save"
+                                            className="shrink-0 rounded-md bg-amber p-1.5 text-ink transition hover:bg-amber-dim"
+                                        >
+                                          <MdCheck size={16} />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={cancelEdit}
+                                            title="Cancel"
+                                            className="shrink-0 rounded-md p-1.5 text-muted transition hover:bg-surface-raised hover:text-cream"
+                                        >
+                                          <MdClose size={16} />
+                                        </button>
+                                      </div>
+
+                                      <p className="mt-1 text-[11px] text-muted">
+                                        Enter to save · Esc to cancel
+                                      </p>
+                                    </div>
+                                ) : message.type === 'IMAGE' ||
+                                message.type === 'VIDEO' ||
+                                message.type === 'AUDIO' ? (
+                                    <div className="mt-1.5">
+                                      <MediaMessage
+                                          url={
+                                            message.content
+                                          }
+                                          type={
+                                            message.type
+                                          }
+                                      />
+                                    </div>
+                                ) : (
+                                    <p className="mt-0.5 break-words text-sm leading-relaxed text-cream/90">
+                                      {message.content}
+                                    </p>
+                                )}
 
                               </div>
 
-                              {message.type === 'IMAGE' ||
-                              message.type === 'VIDEO' ||
-                              message.type === 'AUDIO' ? (
-                                  <div className="mt-1.5">
-                                    <MediaMessage
-                                        url={
-                                          message.content
-                                        }
-                                        type={
-                                          message.type
-                                        }
-                                    />
-                                  </div>
-                              ) : (
-                                  <p className="mt-0.5 break-words text-sm leading-relaxed text-cream/90">
-                                    {message.content}
-                                  </p>
-                              )}
+                              {/* Edit / delete (own messages only) */}
+                              {canModify && (
+                                  <div className="absolute right-2 top-1 flex items-center gap-0.5 rounded-md border border-border-subtle bg-surface-raised px-1 py-0.5 opacity-0 shadow transition focus-within:opacity-100 group-hover:opacity-100">
 
+                                    {isTextMessage && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                startEdit(message)
+                                            }
+                                            title="Edit"
+                                            className="rounded p-1 text-muted transition hover:bg-ink hover:text-cream"
+                                        >
+                                          <MdEdit size={14} />
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            deleteMessage(message)
+                                        }
+                                        title="Delete"
+                                        className="rounded p-1 text-muted transition hover:bg-ink hover:text-rose"
+                                    >
+                                      <MdDelete size={14} />
+                                    </button>
+
+                                  </div>
+                              )}
                             </div>
-                          </div>
-                      )
+                        );
+                      }
                   )}
 
                 </div>
