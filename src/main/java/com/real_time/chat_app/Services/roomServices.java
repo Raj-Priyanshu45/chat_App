@@ -100,7 +100,7 @@ public class roomServices {
 //            repo.save(room);
 //        }
 
-        RoomMember member = memberRepo.findByUserIdAndRoomId(userId , roomInfo.roomnId()).orElse(null);
+        RoomMember member = memberRepo.findByUserIdAndRoomId(userId , roomInfo.roomId()).orElse(null);
 
         if(member == null){
             member = RoomMember.builder()
