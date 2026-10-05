@@ -6,6 +6,7 @@ import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 import {
   getPublicRooms,
+  getRoomMembersApi,
   joinChatApi,
 } from '../services/RoomService';
 
@@ -36,6 +37,8 @@ const DiscoverRooms = () => {
       return;
     }
 
+    let cancelled = false;
+
     const loadRooms = async () => {
       try {
         setLoading(true);
@@ -46,15 +49,59 @@ const DiscoverRooms = () => {
             sortBy
         );
 
-        setRooms(page?.content || []);
+        const list = page?.content || [];
+
+        /*
+         * Member count = size of the member-id list
+         * returned by /api/v1/rooms/{roomId}/members.
+         * One request per room, run in parallel.
+         */
+        const withCounts = await Promise.all(
+            list.map(async (room) => {
+              try {
+                const ids = await getRoomMembersApi(room.roomId);
+
+                return {
+                  ...room,
+                  memberCount: ids.length,
+                };
+              } catch {
+                return {
+                  ...room,
+                  memberCount: null,
+                };
+              }
+            })
+        );
+
+        // "Most active" = most members. "Newest" keeps the backend order.
+        if (sortBy !== 'timestamp') {
+          withCounts.sort(
+              (a, b) =>
+                  (b.memberCount ?? -1) -
+                  (a.memberCount ?? -1)
+          );
+        }
+
+        if (!cancelled) {
+          setRooms(withCounts);
+        }
       } catch {
-        toast.error('Unable to load public rooms.');
+        if (!cancelled) {
+          toast.error('Unable to load public rooms.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     loadRooms();
+
+    return () => {
+      cancelled = true;
+    };
   }, [auth.authenticated, sortBy]);
 
   const handleJoin = async (roomId) => {
@@ -71,9 +118,8 @@ const DiscoverRooms = () => {
 
       setCurrentUser(currentUserId);
 
-      // Current members are avlUser.
-      // These values are Mongo IDs.
-      setRoomUsers(room?.avlUser || []);
+      // Members are fetched on demand from the Members button in ChatPage.
+      setRoomUsers([]);
 
       setIsDm(false);
       setDmTarget('');
@@ -148,8 +194,8 @@ const DiscoverRooms = () => {
                         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                           <span className="h-1.5 w-1.5 rounded-full bg-sage" />
 
-                          {room.numberAvlUser} member
-                          {room.numberAvlUser === 1 ? '' : 's'}
+                          {room.memberCount ?? '—'} member
+                          {room.memberCount === 1 ? '' : 's'}
                         </p>
                       </div>
 
