@@ -91,7 +91,7 @@ public class JwtCreation {
                 .subject(users.getId())
                 .claim("role", users.getRole().name())
                 .claim("state", users.getState().name())
-                .claim("email_verified", Verified)
+                .claim("email_verified", Not_Verified.name())
                 .issuedAt(new Date())
                 .expiration(
                         new Date(

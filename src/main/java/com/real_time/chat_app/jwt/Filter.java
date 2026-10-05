@@ -8,6 +8,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -26,6 +27,7 @@ import java.util.List;
 import io.jsonwebtoken.security.Keys;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class Filter extends OncePerRequestFilter {
 
@@ -69,6 +71,7 @@ public class Filter extends OncePerRequestFilter {
         }
 
         catch (Exception e){
+            log.warn("JWT rejected on {}: {}", request.getRequestURI(), e.getMessage());
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired JWT");
             return;
         }
