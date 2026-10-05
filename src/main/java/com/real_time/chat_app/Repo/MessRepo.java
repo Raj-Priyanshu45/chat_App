@@ -16,4 +16,11 @@ public interface MessRepo extends MongoRepository<Message, String> {
             String roomId,
             LocalDateTime timestamp
     );
+
+    List<Message> findByRoomIdAndDelFalse(String roomId);
+
+    List<Message> findByRoomIdAndDelFalseAndTimeStampAfterOrderByTimeStampAsc(
+            String roomId,
+            LocalDateTime timestamp
+    );
 }

@@ -2,14 +2,8 @@ package com.real_time.chat_app.Services;
 
 import com.real_time.chat_app.DTOs.joinRoom;
 import com.real_time.chat_app.DTOs.roomId;
-import com.real_time.chat_app.Models.Message;
-import com.real_time.chat_app.Models.Rooms;
-import com.real_time.chat_app.Models.UserExtras;
-import com.real_time.chat_app.Models.Users;
-import com.real_time.chat_app.Repo.ExtrasRepo;
-import com.real_time.chat_app.Repo.MessRepo;
-import com.real_time.chat_app.Repo.UserRepo;
-import com.real_time.chat_app.Repo.roomRepo;
+import com.real_time.chat_app.Models.*;
+import com.real_time.chat_app.Repo.*;
 import com.real_time.chat_app.enums.ScopeVar;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +25,7 @@ public class roomServices {
     private final MessRepo messRepo;
     private final UserRepo userRepo;
     private final ExtrasRepo extraRepo;
+    private final MemberRepo memberRepo;
 
     public Rooms createRoom(@Valid roomId roomId, String userId) {
 
@@ -44,13 +39,20 @@ public class roomServices {
 
         Rooms newRoom = Rooms.builder()
                 .roomId(roomId.roomId())
-                .users(List.of(user.getId()))
                 .scopeVar(roomId.var())
                 .timeStamp(LocalDateTime.now())
                 .password(roomId.var() == ScopeVar.Public ? null : roomId.password())
-                .avlUser(Set.of(user.getId()))
-                .numberAvlUser(1)
                 .build();
+
+        RoomMember member = RoomMember.builder()
+                .userId(userId)
+                .roomId(roomId.roomId())
+                .leftAt(null)
+                .lastReadMessageTime(LocalDateTime.now())
+                .joinedAt(LocalDateTime.now())
+                .build();
+
+        memberRepo.save(member);
 
         return repo.save(newRoom);
     }
@@ -90,13 +92,25 @@ public class roomServices {
 
         extraRepo.save(extras);
 
-        if (!room.getAvlUser().contains(user.getId())) {
+//        if (!room.getAvlUser().contains(user.getId())) {
+//
+//            room.getUsers().add(user.getId());
+//            room.getAvlUser().add(user.getId());
+//
+//            repo.save(room);
+//        }
 
-            room.getUsers().add(user.getId());
-            room.getAvlUser().add(user.getId());
-            room.setNumberAvlUser(room.getNumberAvlUser() + 1);
+        if(memberRepo.existsByRoomIdAndUserId(roomInfo.roomId(), userId)){
 
-            repo.save(room);
+            RoomMember member = RoomMember.builder()
+                    .joinedAt(LocalDateTime.now())
+                    .roomId(roomInfo.roomId())
+                    .leftAt(null)
+                    .lastReadMessageTime(LocalDateTime.now())
+                    .userId(userId)
+                    .build();
+
+            memberRepo.save(member);
         }
 
         return room;
@@ -108,9 +122,9 @@ public class roomServices {
 
         if (room == null) return null;
 
-        List<Message> messages = messRepo.findByRoomId(roomId);
+        List<Message> messages = messRepo.findByRoomIdAndDelFalse(roomId);
 
-        log.info("Request for retrieving message");
+        log.info("Request for retrieving message of room id {}", roomId);
 
         int start = Math.max(0, messages.size() - (page + 1) * size);
 
@@ -122,7 +136,7 @@ public class roomServices {
     }
 
     public List<Message> retMessSince(String roomId, LocalDateTime timestamp) {
-        return messRepo.findByRoomIdAndTimeStampAfterOrderByTimeStampAsc(
+        return messRepo.findByRoomIdAndDelFalseAndTimeStampAfterOrderByTimeStampAsc(
                 roomId,
                 timestamp
         );
@@ -156,11 +170,20 @@ public class roomServices {
 
         if (user == null) return;
 
-        if (!room.getAvlUser().contains(user.getId())) return;
+//        if (!room.getAvlUser().contains(user.getId())) return;
+//
+//        room.getAvlUser().remove(user.getId());
 
-        room.getAvlUser().remove(user.getId());
+        RoomMember member = memberRepo.findByUserIdAndRoomId(userId , roomId).orElse(null);
 
-        room.setNumberAvlUser(room.getNumberAvlUser() - 1);
+        if(member == null){
+            log.warn("Wrong attempt to leave room by {} room id {}" , userId , roomId);
+            throw new RuntimeException("Member Not Found");
+        }
+
+        member.setLeftAt(LocalDateTime.now());
+
+        memberRepo.save(member);
 
         repo.save(room);
     }
@@ -173,6 +196,9 @@ public class roomServices {
             throw new RuntimeException("Room Not Found");
         }
 
-        return room.getAvlUser().stream().toList();
+        List<RoomMember> avlMember = memberRepo.findByRoomIdAndLeftAtIsNull(roomId);
+
+        return avlMember.stream()
+                .map(RoomMember::getId).toList();
     }
 }

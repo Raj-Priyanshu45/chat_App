@@ -24,7 +24,6 @@ public class ProfileUpdateService {
 
     private final UserRepo userRepo;
     private final ExtrasRepo extraRepo;
-    private final AuthRepo authRepo;
     private final Cloudinary cloudinary;
     private final ImageVideoService imageService;
 

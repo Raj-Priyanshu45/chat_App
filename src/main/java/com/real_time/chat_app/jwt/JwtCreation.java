@@ -84,11 +84,13 @@ public class JwtCreation {
 
     public String generateIncompleteToken(Users users) {
 
+
+
         return Jwts.builder()
                 .subject(users.getId())
                 .claim("role", users.getRole().name())
                 .claim("state", users.getState().name())
-                .claim("onboarding", true)
+                .claim("email_verified", Not_Verified)
                 .issuedAt(new Date())
                 .expiration(
                         new Date(

@@ -7,6 +7,6 @@ import java.lang.annotation.*;
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@PreAuthorize("hasAuthority('STATE_Verified')")
+@PreAuthorize("hasAuthority('EMAIL_Not_Verified')")
 public @interface EmailVer {
 }

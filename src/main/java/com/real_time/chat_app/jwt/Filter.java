@@ -50,11 +50,13 @@ public class Filter extends OncePerRequestFilter {
             String username = claims.getSubject();
             String role = claims.get("role" , String.class);
             String status = claims.get("state" , String.class);
+            String emailVerified = claims.get("email_verified" , String.class);
 
              List<GrantedAuthority> grantedAuthority = new ArrayList<>();
 
              grantedAuthority.add(new SimpleGrantedAuthority("ROLE_"+role));
              grantedAuthority.add(new SimpleGrantedAuthority("STATE_"+status));
+             grantedAuthority.add(new SimpleGrantedAuthority("EMAIL_"+emailVerified));
 
             Authentication authentication = new UsernamePasswordAuthenticationToken(
                     username ,

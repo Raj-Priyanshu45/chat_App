@@ -22,6 +22,7 @@ public class Message {
     private String content;
     private LocalDateTime timeStamp;
     private Content_Type type;
+    private boolean del;
 
     public Message(String roomId , String sender , String content){
         this.roomId = roomId;

@@ -1,14 +1,8 @@
 package com.real_time.chat_app.Services;
 
 import com.real_time.chat_app.DTOs.MessageRequest;
-import com.real_time.chat_app.Models.Message;
-import com.real_time.chat_app.Models.Rooms;
-import com.real_time.chat_app.Models.UserExtras;
-import com.real_time.chat_app.Models.Users;
-import com.real_time.chat_app.Repo.ExtrasRepo;
-import com.real_time.chat_app.Repo.MessRepo;
-import com.real_time.chat_app.Repo.UserRepo;
-import com.real_time.chat_app.Repo.roomRepo;
+import com.real_time.chat_app.Models.*;
+import com.real_time.chat_app.Repo.*;
 import com.real_time.chat_app.enums.Content_Type;
 import com.real_time.chat_app.enums.ScopeVar;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +24,7 @@ public class chatService {
     private final MessRepo messRepo;
     private final SimpMessagingTemplate messagingTemplate;
     private final ExtrasRepo extraRepo;
+    private final MemberRepo memberRepo;
 
     public Message sendMessage(MessageRequest request, String roomId, String userId) {
 
@@ -103,14 +98,31 @@ public class chatService {
             room = Rooms.builder()
                     .roomId(roomId)
                     .timeStamp(LocalDateTime.now())
-                    .users(List.of(user1, user2))
                     .scopeVar(ScopeVar.DM)
                     .password(null)
-                    .avlUser(Set.of(user1, user2))
-                    .numberAvlUser(2)
                     .build();
 
             roomRepo.save(room);
+
+            RoomMember member1 = RoomMember.builder()
+                    .joinedAt(LocalDateTime.now())
+                    .lastReadMessageTime(LocalDateTime.now())
+                    .leftAt(null)
+                    .roomId(roomId)
+                    .userId(user1)
+                    .build();
+
+            RoomMember member2 = RoomMember.builder()
+                    .joinedAt(LocalDateTime.now())
+                    .lastReadMessageTime(LocalDateTime.now())
+                    .leftAt(null)
+                    .roomId(roomId)
+                    .userId(user2)
+                    .build();
+
+            memberRepo.save(member1);
+            memberRepo.save(member2);
+
         } else {
             room = roomRepo.findByRoomId(roomId).orElse(null);
         }

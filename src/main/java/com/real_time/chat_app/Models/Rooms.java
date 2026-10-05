@@ -25,10 +25,8 @@ public class Rooms {
 
     private String roomId;
 
-//    private List<Message> mess = new ArrayList<>();
-
-    @Builder.Default
-    private List<String> users = new ArrayList<>();
+//    @Builder.Default
+//    private List<String> users = new ArrayList<>();
 
     private ScopeVar scopeVar;
 
@@ -37,10 +35,7 @@ public class Rooms {
 
     private LocalDateTime timeStamp;
 
-    @Builder.Default
-    private Set<String> avlUser = new HashSet<>();
-
-    private int numberAvlUser;
-
+//    @Builder.Default
+//    private Set<String> avlUser = new HashSet<>();
 
 }

@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -173,8 +174,7 @@ public class AuthService {
             throw new RuntimeException("User not found");
         }
 
-        String token =
-                UUID.randomUUID().toString();
+        String token = generateToken();
 
         tokenRepo.deleteByUserId(userId);
 
@@ -335,7 +335,7 @@ public class AuthService {
         UserAuth userAuth = authRepo.findByUserId(user.getId()).orElse(null);
         if (userAuth == null || userAuth.getPassword() == null) return;  // Google/GitHub-only account
 
-        String rawToken = UUID.randomUUID().toString() + UUID.randomUUID();
+        String rawToken = generateToken();
 
         tokenRepo.deleteByUserIdAndType(user.getId(), TokenType.PASSWORD_RESET);
 
@@ -370,11 +370,18 @@ public class AuthService {
         if (userAuth == null) return false;
 
         userAuth.setPassword(passwordEncoder.encode(newPassword));
-        userAuth.setHashedRefreshToken(null);                        // kill every existing session
-        userAuth.setEmailState(EmailVerificationState.Verified);     // they just proved they own the inbox
+        userAuth.setHashedRefreshToken(null);
+        userAuth.setEmailState(EmailVerificationState.Verified);
         authRepo.save(userAuth);
 
-        tokenRepo.delete(token);   // single use
+        tokenRepo.delete(token);
         return true;
+    }
+
+
+
+    private String generateToken(){
+        SecureRandom random = new SecureRandom();
+        return 100000 + random.nextInt(900000)+"";
     }
 }

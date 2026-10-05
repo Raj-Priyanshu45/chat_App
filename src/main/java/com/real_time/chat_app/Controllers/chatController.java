@@ -1,9 +1,13 @@
 package com.real_time.chat_app.Controllers;
 
+import com.real_time.chat_app.DTOs.MessDelRequest;
+import com.real_time.chat_app.DTOs.MessEditRequest;
+import com.real_time.chat_app.DTOs.MessageDelResponse;
 import com.real_time.chat_app.DTOs.MessageRequest;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Services.DmFileUploadService;
 import com.real_time.chat_app.Services.ImageVideoService;
+import com.real_time.chat_app.Services.MessageFeatureService;
 import com.real_time.chat_app.Services.chatService;
 import com.real_time.chat_app.anno.ActiveUser;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +39,7 @@ public class chatController {
     private final chatService chatService;
     private final ImageVideoService fileService;
     private final DmFileUploadService dmService;
+    private final MessageFeatureService messDelService;
 
     @MessageMapping("/sendMessages/{roomId}")
     @SendTo("/topic/room/{roomId}")
@@ -109,4 +114,16 @@ public class chatController {
 //                .body(resource);
 //    }
 
+
+    @MessageMapping("chat/del")
+    @ActiveUser
+    public void delMessage(MessDelRequest req , Principal principal){
+        messDelService.delMessage(principal.getName(), req.messId() , req.roomId());
+    }
+
+    @MessageMapping("chat/edit")
+    @ActiveUser
+    public void editMessage(MessEditRequest request , Principal principal){
+        messDelService.editMessage(principal.getName(), request.messId() , request.updatedContent(), request.roomId());
+    }
 }

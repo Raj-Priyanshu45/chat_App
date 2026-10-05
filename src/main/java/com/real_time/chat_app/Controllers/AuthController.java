@@ -6,6 +6,7 @@ import com.real_time.chat_app.DTOs.ResetPasswordRequest;
 import com.real_time.chat_app.DTOs.UserRegistration;
 import com.real_time.chat_app.Models.User_comp_profile;
 import com.real_time.chat_app.Services.AuthService;
+import com.real_time.chat_app.anno.EmailVer;
 import com.real_time.chat_app.anno.PreAuth;
 import com.real_time.chat_app.enums.RegistrationState;
 import jakarta.servlet.http.HttpServletRequest;
@@ -67,7 +68,7 @@ public class AuthController {
     }
 
     @PostMapping("/comp-profile")
-    @PreAuth
+    @EmailVer
     public ResponseEntity<?> completeProfile(Principal principal , HttpServletResponse response
                                              , @RequestBody User_comp_profile userProfile
     ){

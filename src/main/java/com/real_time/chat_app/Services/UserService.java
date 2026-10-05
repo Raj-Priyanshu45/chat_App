@@ -1,7 +1,9 @@
 package com.real_time.chat_app.Services;
 
+import com.real_time.chat_app.Models.RoomMember;
 import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Models.Users;
+import com.real_time.chat_app.Repo.MemberRepo;
 import com.real_time.chat_app.Repo.UserRepo;
 import com.real_time.chat_app.Repo.roomRepo;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class UserService {
 
     private final UserRepo userRepo;
     private final roomRepo roomRepo;
+    private final MemberRepo memberRepo;
 
     public Page<Users> retAllUsers(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -36,9 +39,12 @@ public class UserService {
             return null;
         }
 
-        List<String> allUsers = room.getUsers();
+        List<RoomMember> allUsers = memberRepo.findByRoomIdAndLeftAtIsNull(roomId);
 
-        return new PageImpl<>(allUsers);
+        List<String> mem = allUsers.stream()
+                .map(RoomMember::getId).toList();
+
+        return new PageImpl<>(mem);
     }
 
     public Users saveOrShowUser(String userId) {
