@@ -75,7 +75,7 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
                     .name(null)
                     .role(Role.USER)
                     .username(UUID.randomUUID().toString())
-                    .state(AccountState.INCOMPLETE)
+                    .state(AccountState.ACTIVE)
                     .build();
 
             userRepo.save(newUser);
@@ -111,7 +111,10 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
             return;
         }
 
-        if (newUser.getState() == AccountState.INCOMPLETE) {
+        UserAuth userAuth = authRepo.findByUserId(newUser.getId()).orElseThrow(() ->
+                 new RuntimeException("Internal Server Error"));
+
+        if (userAuth.getEmailState() == EmailVerificationState.Not_Verified) {
 
             String incompleteToken =
                     jwtCreation.generateIncompleteToken(newUser);
@@ -135,13 +138,7 @@ public class OAuth2LoginHandler extends SimpleUrlAuthenticationSuccessHandler {
 
         String hashedRefreshToken =
                 jwtCreation.hashRefreshToken(refreshToken);
-
-        UserAuth userAuth =
-                authRepo.findByUserId(newUser.getId()).orElse(null);
-
-        if (userAuth == null) {
-            throw new RuntimeException("Internal server error");
-        }
+        
 
         userAuth.setHashedRefreshToken(hashedRefreshToken);
         authRepo.save(userAuth);
