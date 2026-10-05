@@ -208,6 +208,6 @@ public class roomServices {
         List<RoomMember> avlMember = memberRepo.findByRoomIdAndLeftAtIsNull(roomId);
 
         return avlMember.stream()
-                .map(RoomMember::getId).toList();
+                .map(RoomMember::getUserId).toList();
     }
 }
