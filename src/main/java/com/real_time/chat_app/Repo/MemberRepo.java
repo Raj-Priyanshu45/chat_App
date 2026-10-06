@@ -19,5 +19,5 @@ public interface MemberRepo extends MongoRepository<RoomMember , String> {
 
     List<RoomMember> findByUserIdAndLeftAtIsNull(String userId);
 
-    boolean existsByIdAndRoomIdAndLeftAtIsNull(String id , String roomId);
+    long countByRoomIdAndLeftAtIsNull(String roomId);
 }

@@ -1,5 +1,6 @@
 package com.real_time.chat_app.Services;
 
+import com.real_time.chat_app.DTOs.PublicRoomResponse;
 import com.real_time.chat_app.DTOs.joinRoom;
 import com.real_time.chat_app.DTOs.roomId;
 import com.real_time.chat_app.Models.*;
@@ -9,9 +10,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -151,21 +155,34 @@ public class roomServices {
         );
     }
 
-    public Page<?> getSortedPage(int size, int number, String sortedBy) {
+    public Page<PublicRoomResponse> getSortedPage(int size, int number, String sortedBy) {
 
-        String type = sortedBy.equalsIgnoreCase("timestamp")
-                ? "timeStamp"
-                : "numberAvlUser";
+        size = Math.clamp(size, 1, 50);
+        number = Math.max(number, 0);
 
-        Pageable pageable = PageRequest.of(
-                number,
-                size,
-                Sort.by(type).descending()
-        );
+        if ("timestamp".equalsIgnoreCase(sortedBy)) {
+            Pageable pageable = PageRequest.of(number, size, Sort.by("timeStamp").descending());
+            return repo.findByScopeVar(ScopeVar.Public, pageable).map(this::toPublicRoom);
+        }
 
-        return repo.findByScopeVar(
-                ScopeVar.Public,
-                pageable
+        List<PublicRoomResponse> all = repo.findByScopeVar(ScopeVar.Public).stream()
+                .map(this::toPublicRoom)
+                .sorted(Comparator.comparingLong(PublicRoomResponse::memberCount).reversed()
+                        .thenComparing(PublicRoomResponse::roomId))
+                .toList();
+
+        int from = Math.min(number * size, all.size());
+        int to = Math.min(from + size, all.size());
+
+        return new PageImpl<>(all.subList(from, to), PageRequest.of(number, size), all.size());
+    }
+
+    private PublicRoomResponse toPublicRoom(Rooms room) {
+        return new PublicRoomResponse(
+                room.getRoomId(),
+                room.getScopeVar(),
+                room.getTimeStamp(),
+                memberRepo.countByRoomIdAndLeftAtIsNull(room.getRoomId())
         );
     }
 
@@ -209,5 +226,15 @@ public class roomServices {
 
         return avlMember.stream()
                 .map(RoomMember::getUserId).toList();
+    }
+
+    public void assertMember(String roomId, String userId) {
+
+        if (!Boolean.TRUE.equals(repo.existsByRoomId(roomId))) return;
+
+        if (!memberRepo.existsByRoomIdAndUserIdAndLeftAtIsNull(roomId, userId)) {
+            log.warn("Non-member {} tried to read room {}", userId, roomId);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this room");
+        }
     }
 }

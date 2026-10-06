@@ -72,8 +72,11 @@ public class roomController {
     public ResponseEntity<?> getAllMessages(
             @PathVariable String roomId ,
             @RequestParam(value = "page" , defaultValue = "0" , required = false) int page,
-            @RequestParam(value = "size" , defaultValue = "20" , required = false) int size
+            @RequestParam(value = "size" , defaultValue = "20" , required = false) int size ,
+            Principal principal
     ){
+
+        roomServices.assertMember(roomId, principal.getName());
 
         Page<Message> messages = roomServices.retAllMess(roomId , page , size);
 
@@ -87,7 +90,8 @@ public class roomController {
 
     @GetMapping("/{roomId}/since")
     @ActiveUser
-    public List<Message> reconnectEndpoint(@RequestParam LocalDateTime timestamp , @PathVariable String roomId){
+    public List<Message> reconnectEndpoint(@RequestParam LocalDateTime timestamp , @PathVariable String roomId , Principal principal){
+        roomServices.assertMember(roomId, principal.getName());
         return roomServices.retMessSince(roomId , timestamp);
     }
 
@@ -114,9 +118,9 @@ public class roomController {
     @GetMapping("/{roomId}/members")
     @ActiveUser
     public ResponseEntity<List<String>> getAllMembers(
-            @PathVariable String roomId
+            @PathVariable String roomId , Principal principal
     ) {
-
+        roomServices.assertMember(roomId, principal.getName());
         return ResponseEntity.ok(
                 roomServices.getAllMembers(roomId)
         );
