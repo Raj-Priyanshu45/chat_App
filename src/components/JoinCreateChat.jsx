@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { MdArrowForward, MdLogout } from 'react-icons/md';
 import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
+import MyRooms from './MyRooms';
 import {
   createRoomApi,
   joinChatApi,
@@ -337,7 +338,9 @@ const JoinCreateChat = () => {
                       Create room
                     </button>
                   </div>
+                  <MyRooms />
                 </>
+
             )}
           </div>
         </div>
