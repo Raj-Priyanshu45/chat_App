@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 
 import {
   MdSend,
+  MdChatBubbleOutline,
   MdAttachFile,
   MdGroup,
   MdLogout,
@@ -1035,389 +1036,106 @@ const ChatPage = () => {
   ]);
 
   return (
-      <div className="flex h-screen bg-ink text-cream">
-
-        {/* Sidebar */}
-        <aside className="hidden w-60 shrink-0 flex-col border-r border-border-subtle bg-surface sm:flex">
-
-          <div className="border-b border-border-subtle px-5 py-5">
-
-            <p className="font-mono text-[11px] uppercase tracking-wider text-muted">
-              {isDm
-                  ? 'direct message'
-                  : 'live room'}
-            </p>
-
-            <p className="mt-1 truncate font-mono text-sm text-cream">
-              {isDm
-                  ? `@${dmTargetUsername}`
-                  : roomId}
-            </p>
-          </div>
-
-          <nav className="flex-1 space-y-1 px-3 py-4">
-
-            {!isDm && (
-                <button
-                    type="button"
-                    onClick={openMembers}
-                    className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted transition hover:bg-surface-raised hover:text-cream"
-                >
-                  <MdGroup size={17} />
-                  Members
-                </button>
-            )}
-
-            <button
-                type="button"
-                onClick={() =>
-                    navigate('/discover')
-                }
-                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted transition hover:bg-surface-raised hover:text-cream"
-            >
-              <MdExplore size={17} />
-              Discover rooms
-            </button>
-
-            <button
-                type="button"
-                onClick={() =>
-                    navigate('/profile')
-                }
-                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted transition hover:bg-surface-raised hover:text-cream"
-            >
-              <MdPerson size={17} />
-              Profile
-            </button>
-
-          </nav>
-
-          <div className="space-y-1 border-t border-border-subtle px-3 py-4">
-
-            {/* Visible username */}
-            <div className="mb-2 flex items-center gap-2 rounded-md bg-surface-raised px-3 py-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-sage" />
-
-              <span className="truncate font-mono text-xs text-cream">
-              @{currentUsername}
-            </span>
-            </div>
-
-            <button
-                type="button"
-                onClick={handleLeaveRoom}
-                className="w-full rounded-md px-3 py-2 text-left text-sm text-muted transition hover:bg-surface-raised hover:text-cream"
-            >
-              {isDm
-                  ? 'Close DM'
-                  : 'Leave room'}
-            </button>
-
-            <button
-                type="button"
-                onClick={handleLogout}
-                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-rose transition hover:bg-rose/10"
-            >
-              <MdLogout size={16} />
-              Logout
-            </button>
-
-          </div>
-        </aside>
-
-        {showMembers && (
-            <MembersModal
-                members={memberViewModels}
-                onMessagePrivately={handleStartDm}
-                onViewProfile={setProfileUserId}
-                onClose={() => setShowMembers(false)}
-            />
-        )}
-
-        {profileUserId && (
-            <UserProfileModal
-                userId={profileUserId}
-                onMessage={(id) => {
-                  setProfileUserId(null);
-                  setShowMembers(false);
-                  handleStartDm(id);
-                }}
-                onClose={() => setProfileUserId(null)}
-            />
-        )}
-
-        {/* Main */}
-        <div className="flex min-w-0 flex-1 flex-col">
-
-          <header className="flex items-center justify-between border-b border-border-subtle bg-surface/60 px-5 py-3.5 backdrop-blur">
-
-            {/* Visible username for DM */}
-            <p className="truncate font-mono text-sm text-cream">
-              {isDm
-                  ? `@${dmTargetUsername}`
-                  : `#${roomId}`}
-            </p>
-
-            <div className="flex items-center gap-1 sm:hidden">
-              <button
-                  type="button"
-                  onClick={handleLeaveRoom}
-                  className="rounded-md px-3 py-1.5 text-xs text-muted transition hover:text-cream"
-              >
-                {isDm
-                    ? 'Close'
-                    : 'Leave'}
-              </button>
-
-              <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="rounded-md px-3 py-1.5 text-xs text-rose transition hover:text-cream"
-              >
-                Logout
-              </button>
-            </div>
-
-          </header>
-
-          <main
-              ref={chatBoxRef}
-              className="flex-1 overflow-y-auto px-5 py-4"
-          >
-
-            {groupedMessages.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <p className="text-sm text-muted">
-                    No messages yet. Start the conversation.
-                  </p>
-                </div>
-            ) : (
-                <div className="mx-auto flex max-w-3xl flex-col">
-
-                  {groupedMessages.map(
-                      (message) => {
-                        const isOwn =
-                            message.sender ===
-                            currentUserId;
-
-                        const isTextMessage =
-                            !message.type ||
-                            message.type === 'TEXT';
-
-                        const isEditing =
-                            editingId !== null &&
-                            editingId === message.realId;
-
-                        const canModify =
-                            isOwn &&
-                            Boolean(message.realId) &&
-                            !isEditing;
-
-                        return (
-                            <div
-                                key={message.id}
-                                className="group relative flex gap-3 rounded-md px-2 py-2 transition hover:bg-surface/50"
-                            >
-
-                              {/* Avatar */}
-                              <div className="mt-0.5">
-                                <Avatar
-                                    src={avatarOf(message.sender)}
-                                    name={message.displaySender}
-                                    size={32}
-                                />
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-
-                                <div className="flex items-baseline gap-2">
-
-                          <span
-                              className={`font-mono text-sm font-medium ${
-                                  isOwn
-                                      ? 'text-amber'
-                                      : 'text-cream'
-                              }`}
-                          >
-                            {message.displaySender}
-                          </span>
-
-                                  <span className="font-mono text-[11px] text-muted">
-                            {formatTime(
-                                message.timeStamp
-                            )}
-                          </span>
-
-                                  {message.edited && (
-                                      <span className="text-[11px] text-muted">
-                              (edited)
-                            </span>
-                                  )}
-
-                                </div>
-
-                                {isEditing ? (
-                                    <div className="mt-1">
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                            autoFocus
-                                            value={editText}
-                                            onChange={(event) =>
-                                                setEditText(
-                                                    event.target.value
-                                                )
-                                            }
-                                            onKeyDown={(event) => {
-                                              if (event.key === 'Enter') {
-                                                event.preventDefault();
-                                                submitEdit();
-                                              } else if (event.key === 'Escape') {
-                                                cancelEdit();
-                                              }
-                                            }}
-                                            className="flex-1 rounded-md border border-amber bg-surface px-3 py-1.5 text-sm text-cream outline-none"
-                                        />
-
-                                        <button
-                                            type="button"
-                                            onClick={submitEdit}
-                                            title="Save"
-                                            className="shrink-0 rounded-md bg-amber p-1.5 text-ink transition hover:bg-amber-dim"
-                                        >
-                                          <MdCheck size={16} />
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={cancelEdit}
-                                            title="Cancel"
-                                            className="shrink-0 rounded-md p-1.5 text-muted transition hover:bg-surface-raised hover:text-cream"
-                                        >
-                                          <MdClose size={16} />
-                                        </button>
-                                      </div>
-
-                                      <p className="mt-1 text-[11px] text-muted">
-                                        Enter to save · Esc to cancel
-                                      </p>
-                                    </div>
-                                ) : message.type === 'IMAGE' ||
-                                message.type === 'VIDEO' ||
-                                message.type === 'AUDIO' ? (
-                                    <div className="mt-1.5">
-                                      <MediaMessage
-                                          url={
-                                            message.content
-                                          }
-                                          type={
-                                            message.type
-                                          }
-                                      />
-                                    </div>
-                                ) : (
-                                    <p className="mt-0.5 break-words text-sm leading-relaxed text-cream/90">
-                                      {message.content}
-                                    </p>
-                                )}
-
-                              </div>
-
-                              {/* Edit / delete (own messages only) */}
-                              {canModify && (
-                                  <div className="absolute right-2 top-1 flex items-center gap-0.5 rounded-md border border-border-subtle bg-surface-raised px-1 py-0.5 opacity-0 shadow transition focus-within:opacity-100 group-hover:opacity-100">
-
-                                    {isTextMessage && (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                startEdit(message)
-                                            }
-                                            title="Edit"
-                                            className="rounded p-1 text-muted transition hover:bg-ink hover:text-cream"
-                                        >
-                                          <MdEdit size={14} />
-                                        </button>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            deleteMessage(message)
-                                        }
-                                        title="Delete"
-                                        className="rounded p-1 text-muted transition hover:bg-ink hover:text-rose"
-                                    >
-                                      <MdDelete size={14} />
-                                    </button>
-
-                                  </div>
-                              )}
-                            </div>
-                        );
-                      }
-                  )}
-
-                </div>
-            )}
-
-          </main>
-
-          <footer className="border-t border-border-subtle bg-surface/60 px-5 py-4 backdrop-blur">
-
-            <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-md border border-border-subtle bg-surface px-3 py-2.5 transition focus-within:border-amber">
-
-              <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  accept="image/*,video/*,audio/*"
-                  multiple
-              />
-
-              <button
-                  type="button"
-                  onClick={() =>
-                      fileInputRef.current?.click()
-                  }
-                  className="shrink-0 rounded-md p-2 text-muted transition hover:bg-surface-raised hover:text-cream"
-              >
-                <MdAttachFile size={18} />
-              </button>
-
-              <input
-                  value={input}
-                  onChange={(event) =>
-                      setInput(
-                          event.target.value
-                      )
-                  }
-                  onKeyDown={(event) => {
-                    if (
-                        event.key === 'Enter'
-                    ) {
-                      sendMessage();
-                    }
-                  }}
-                  placeholder="Message..."
-                  className="flex-1 bg-transparent px-1 py-1 text-sm text-cream outline-none placeholder-muted/60"
-              />
-
-              <button
-                  type="button"
-                  onClick={sendMessage}
-                  disabled={!input.trim()}
-                  className="shrink-0 rounded-md bg-amber p-2 text-ink transition hover:bg-amber-dim disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                <MdSend size={17} />
-              </button>
-
-            </div>
-          </footer>
-
+    <div className="chat-page page-enter">
+      <aside className="chat-rail">
+        <div className="chat-rail-top">
+          <button type="button" className="icon-button" onClick={() => navigate('/')} title="Home" aria-label="Home">
+            <span className="brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}>co</span>
+          </button>
+          {!isDm && <button type="button" className="icon-button" onClick={openMembers} title="Members" aria-label="Members"><MdGroup size={18} /></button>}
+          <button type="button" className="icon-button" onClick={() => navigate('/discover')} title="Discover rooms" aria-label="Discover rooms"><MdExplore size={18} /></button>
+          <button type="button" className="icon-button" onClick={() => navigate('/profile')} title="Profile" aria-label="Profile"><MdPerson size={18} /></button>
+          <span className="chat-rail-label">live workspace</span>
         </div>
-      </div>
+        <button type="button" className="icon-button" onClick={handleLogout} title="Log out" aria-label="Log out"><MdLogout size={18} /></button>
+      </aside>
+
+      {showMembers && <MembersModal members={memberViewModels} onMessagePrivately={handleStartDm} onViewProfile={setProfileUserId} onClose={() => setShowMembers(false)} />}
+      {profileUserId && (
+        <UserProfileModal
+          userId={profileUserId}
+          onMessage={(id) => { setProfileUserId(null); setShowMembers(false); handleStartDm(id); }}
+          onClose={() => setProfileUserId(null)}
+        />
+      )}
+
+      <section className="chat-workspace">
+        <header className="chat-header">
+          <div className="chat-header-main">
+            <div className="chat-header-kicker">{isDm ? 'direct conversation' : 'live room'}</div>
+            <div className="chat-header-title">{isDm ? <><span>@</span>{dmTargetUsername}</> : <><span>#</span>{roomId}</>}</div>
+          </div>
+          <div className="chat-header-actions">
+            {connected && <div className="connection-pill"><span className="live-dot" /> Connected</div>}
+            {!isDm && <button type="button" className="btn btn-secondary" onClick={openMembers}><MdGroup size={16} /> Members</button>}
+            <button type="button" className="icon-button" onClick={handleLeaveRoom} title={isDm ? 'Close conversation' : 'Leave room'} aria-label={isDm ? 'Close conversation' : 'Leave room'}><MdClose size={18} /></button>
+          </div>
+        </header>
+
+        <main ref={chatBoxRef} className="chat-scroll" aria-label="Messages">
+          <div className="chat-inner">
+            {groupedMessages.length === 0 ? (
+              <div className="chat-empty">
+                <div className="chat-empty-inner">
+                  <div className="chat-empty-glyph"><MdChatBubbleOutline size={28} /></div>
+                  <h1 className="chat-empty-title">Start the conversation</h1>
+                  <p className="chat-empty-copy">{isDm ? `You and @${dmTargetUsername} have not exchanged a message here yet.` : 'This room is quiet right now. Send the first message and give the room a pulse.'}</p>
+                </div>
+              </div>
+            ) : (
+              groupedMessages.map((message) => {
+                const isOwn = message.sender === currentUserId;
+                const isTextMessage = !message.type || message.type === 'TEXT';
+                const isEditing = editingId !== null && editingId === message.realId;
+                const canModify = isOwn && Boolean(message.realId) && !isEditing;
+                return (
+                  <article key={message.id} className="message-row">
+                    <div className="message-avatar"><Avatar src={avatarOf(message.sender)} name={message.displaySender} size={36} /></div>
+                    <div className="message-content">
+                      <div className="message-meta">
+                        <span className={`message-author ${isOwn ? 'is-self' : ''}`}>{message.displaySender}</span>
+                        <span className="message-time">{formatTime(message.timeStamp)}</span>
+                        {message.edited && <span className="message-edited">edited</span>}
+                      </div>
+                      {isEditing ? (
+                        <div>
+                          <div className="message-edit-shell">
+                            <input autoFocus value={editText} onChange={(event) => setEditText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submitEdit(); } else if (event.key === 'Escape') cancelEdit(); }} />
+                            <button type="button" className="icon-button" onClick={submitEdit} title="Save edit" aria-label="Save edit"><MdCheck size={17} /></button>
+                            <button type="button" className="icon-button" onClick={cancelEdit} title="Cancel edit" aria-label="Cancel edit"><MdClose size={17} /></button>
+                          </div>
+                          <p className="message-edit-help">Enter to save · Esc to cancel</p>
+                        </div>
+                      ) : message.type === 'IMAGE' || message.type === 'VIDEO' || message.type === 'AUDIO' ? (
+                        <div style={{ marginTop: 7 }}><MediaMessage url={message.content} type={message.type} /></div>
+                      ) : (
+                        <p className="message-body">{message.content}</p>
+                      )}
+                    </div>
+                    {canModify && (
+                      <div className="message-actions">
+                        {isTextMessage && <button type="button" className="message-action" onClick={() => startEdit(message)} title="Edit message" aria-label="Edit message"><MdEdit size={15} /></button>}
+                        <button type="button" className="message-action is-danger" onClick={() => deleteMessage(message)} title="Delete message" aria-label="Delete message"><MdDelete size={15} /></button>
+                      </div>
+                    )}
+                  </article>
+                );
+              })
+            )}
+          </div>
+        </main>
+
+        <footer className="composer-wrap">
+          <div className="composer">
+            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,audio/*" multiple />
+            <button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} title="Attach media" aria-label="Attach media"><MdAttachFile size={18} /></button>
+            <input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') sendMessage(); }} placeholder={isDm ? `Message @${dmTargetUsername}` : `Message #${roomId}`} aria-label="Message" />
+            <button type="button" className="btn btn-primary" onClick={sendMessage} disabled={!input.trim()} title="Send message"><MdSend size={18} /><span className="hidden sm:inline">Send</span></button>
+          </div>
+          <div className="composer-note"><span>media supported · image / video / audio</span><span>enter to send</span></div>
+        </footer>
+      </section>
+    </div>
   );
 };
-
 export default ChatPage;

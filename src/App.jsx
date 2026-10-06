@@ -19,7 +19,20 @@ function App() {
   return (
       <ChatProvider>
         <BrowserRouter>
-          <Toaster position="top-right" />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3200,
+              style: {
+                background: '#171a18',
+                color: '#f4f1e9',
+                border: '1px solid rgba(255,255,255,.09)',
+                borderRadius: '14px',
+                fontSize: '12px',
+                boxShadow: '0 18px 55px rgba(0,0,0,.32)',
+              },
+            }}
+          />
           <Routes>
             {/* public */}
             <Route path="/login" element={<LoginPage />} />

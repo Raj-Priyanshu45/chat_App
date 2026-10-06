@@ -1,94 +1,66 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { MdArrowForward } from 'react-icons/md';
 import { resetPasswordApi } from '../services/AuthService';
-import { AuthShell, Field } from './AuthShell';
+import AuthShell from './AuthShell';
 
-// Works two ways:
-//   1. a link  /reset-password?token=TOKEN  -> token is prefilled
-//   2. the email contains just the token -> user pastes it here
 const ResetPasswordPage = () => {
-    const [params] = useSearchParams();
-    const [form, setForm] = useState({
-        token: params.get('token') || '',
-        password: '',
-        confirm: '',
-    });
-    const [busy, setBusy] = useState(false);
-    const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const [form, setForm] = useState({ token: params.get('token') || '', password: '', confirm: '' });
+  const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
 
-    const handleChange = (event) => {
-        const { name, value } = event.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
-    };
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!form.token.trim()) return toast.error('Enter the reset token from your email.');
+    if (form.password.length < 8) return toast.error('Password must be at least 8 characters.');
+    if (form.password !== form.confirm) return toast.error('Passwords do not match.');
 
-        if (!form.token.trim()) {
-            toast.error('Enter the reset token from your email.');
-            return;
-        }
-        if (form.password.length < 8) {
-            toast.error('Password must be at least 8 characters.');
-            return;
-        }
-        if (form.password !== form.confirm) {
-            toast.error('Passwords do not match.');
-            return;
-        }
+    setBusy(true);
+    try {
+      await resetPasswordApi(form.token.trim(), form.password);
+      toast.success('Password updated. Log in with your new password.');
+      navigate('/login', { replace: true });
+    } catch (error) {
+      const data = error?.response?.data;
+      toast.error(typeof data === 'string' ? data : 'Could not reset the password.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
-        setBusy(true);
-        try {
-            await resetPasswordApi(form.token.trim(), form.password);
-            toast.success('Password updated. Log in with your new password.');
-            navigate('/login', { replace: true });
-        } catch (error) {
-            const data = error?.response?.data;
-            toast.error(typeof data === 'string' ? data : 'Could not reset the password.');
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    return (
-        <AuthShell
-            title="Choose a new password"
-            subtitle="Paste the token from your email. You'll be asked to log in again afterwards."
-            footer={
-                <Link to="/forgot-password" className="text-amber transition-colors hover:text-cream">
-                    Request a new token
-                </Link>
-            }
-        >
-            <form onSubmit={handleSubmit}>
-                <Field label="Token" name="token" value={form.token} onChange={handleChange} />
-                <Field
-                    label="New password"
-                    name="password"
-                    type="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    autoComplete="new-password"
-                />
-                <Field
-                    label="Confirm password"
-                    name="confirm"
-                    type="password"
-                    value={form.confirm}
-                    onChange={handleChange}
-                    autoComplete="new-password"
-                />
-                <button
-                    type="submit"
-                    disabled={busy}
-                    className="mt-8 w-full rounded-md bg-amber px-4 py-3 text-sm font-semibold text-ink transition hover:bg-amber-dim disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                    {busy ? 'Saving…' : 'Update password'}
-                </button>
-            </form>
-        </AuthShell>
-    );
+  return (
+    <AuthShell
+      title="Set a new password"
+      subtitle="Choose a strong password and your account will be ready to use again."
+      footer={<Link to="/forgot-password" className="auth-link">Request a new token</Link>}
+    >
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <label className="field">
+          <span className="field-label">Reset token</span>
+          <input name="token" value={form.token} onChange={handleChange} placeholder="Paste token" autoFocus />
+        </label>
+        <label className="field">
+          <span className="field-label">New password</span>
+          <input name="password" type="password" value={form.password} onChange={handleChange} autoComplete="new-password" placeholder="At least 8 characters" />
+        </label>
+        <label className="field">
+          <span className="field-label">Confirm password</span>
+          <input name="confirm" type="password" value={form.confirm} onChange={handleChange} autoComplete="new-password" placeholder="Repeat password" />
+        </label>
+        <button type="submit" disabled={busy} className="btn btn-primary">
+          {busy ? 'Updating…' : 'Update password'}
+          {!busy && <MdArrowForward size={17} />}
+        </button>
+      </form>
+    </AuthShell>
+  );
 };
 
 export default ResetPasswordPage;
