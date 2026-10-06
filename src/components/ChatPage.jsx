@@ -10,7 +10,7 @@ import Avatar from './Avatar';
 import { useAvatars } from '../hooks/useAvatars';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
-
+import UserProfileModal from './UserProfileModal';
 import toast from 'react-hot-toast';
 
 import {
@@ -109,6 +109,7 @@ const ChatPage = () => {
   const [input, setInput] = useState('');
   const [stompClient, setStompClient] = useState(null);
   const [showMembers, setShowMembers] = useState(false);
+  const [profileUserId, setProfileUserId] = useState(null);
   const [memberIds, setMemberIds] = useState([]);
 
   // Inline edit state
@@ -281,6 +282,8 @@ const ChatPage = () => {
   useEffect(() => {
     setEditingId(null);
     setEditText('');
+    setProfileUserId(null);
+    setShowMembers(false);
   }, [roomId]);
 
   const scrollToBottom = () => {
@@ -1125,12 +1128,21 @@ const ChatPage = () => {
         {showMembers && (
             <MembersModal
                 members={memberViewModels}
-                onMessagePrivately={
-                  handleStartDm
-                }
-                onClose={() =>
-                    setShowMembers(false)
-                }
+                onMessagePrivately={handleStartDm}
+                onViewProfile={setProfileUserId}
+                onClose={() => setShowMembers(false)}
+            />
+        )}
+
+        {profileUserId && (
+            <UserProfileModal
+                userId={profileUserId}
+                onMessage={(id) => {
+                  setProfileUserId(null);
+                  setShowMembers(false);
+                  handleStartDm(id);
+                }}
+                onClose={() => setProfileUserId(null)}
             />
         )}
 

@@ -6,7 +6,6 @@ import useChatContext from '../context/ChatContext';
 import useAuth from '../context/AuthContext';
 import {
   getPublicRooms,
-  getRoomMembersApi,
   joinChatApi,
 } from '../services/RoomService';
 
@@ -43,45 +42,8 @@ const DiscoverRooms = () => {
       try {
         setLoading(true);
 
-        const page = await getPublicRooms(
-            20,
-            0,
-            sortBy
-        );
-
-        const list = page?.content || [];
-
-        /*
-         * Member count = size of the member-id list
-         * returned by /api/v1/rooms/{roomId}/members.
-         * One request per room, run in parallel.
-         */
-        const withCounts = await Promise.all(
-            list.map(async (room) => {
-              try {
-                const ids = await getRoomMembersApi(room.roomId);
-
-                return {
-                  ...room,
-                  memberCount: ids.length,
-                };
-              } catch {
-                return {
-                  ...room,
-                  memberCount: null,
-                };
-              }
-            })
-        );
-
-        // "Most active" = most members. "Newest" keeps the backend order.
-        if (sortBy !== 'timestamp') {
-          withCounts.sort(
-              (a, b) =>
-                  (b.memberCount ?? -1) -
-                  (a.memberCount ?? -1)
-          );
-        }
+        const page = await getPublicRooms(20, 0, sortBy);
+        const withCounts = page?.content || [];
 
         if (!cancelled) {
           setRooms(withCounts);

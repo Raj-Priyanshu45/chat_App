@@ -21,3 +21,9 @@ export const fetchWsTicketApi = async () => {
   const response = await httpClient.get('/api/v1/ws-ticket');
   return response.data.ticket;
 };
+
+// GET /api/v1/get-details/{userId} -> { username, name, profilePicUrl }
+export const getUserProfileApi = async (userId) => {
+  const response = await httpClient.get(`/api/v1/get-details/${userId}`);
+  return response.data;
+};

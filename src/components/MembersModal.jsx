@@ -8,6 +8,7 @@ import Avatar from './Avatar';
 const MembersModal = ({
                           members,
                           onMessagePrivately,
+                          onViewProfile,
                           onClose,
                       }) => {
     const [openMenuFor, setOpenMenuFor] = useState(null);
@@ -62,8 +63,8 @@ const MembersModal = ({
                                         />
 
                                         <span className="font-mono text-sm text-cream">
-                            {username}
-                          </span>
+                                            {username}
+                                        </span>
 
                                     </div>
 
@@ -83,6 +84,17 @@ const MembersModal = ({
 
                                     {openMenuFor === userId && (
                                         <div className="absolute right-2 top-11 z-10 w-44 rounded-md border border-border-subtle bg-surface-raised py-1 shadow-xl">
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setOpenMenuFor(null);
+                                                    onViewProfile(userId);
+                                                }}
+                                                className="block w-full px-4 py-2 text-left text-sm text-cream hover:bg-ink"
+                                            >
+                                                View profile
+                                            </button>
 
                                             <button
                                                 type="button"
