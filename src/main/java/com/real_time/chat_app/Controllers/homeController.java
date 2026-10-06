@@ -1,12 +1,13 @@
 package com.real_time.chat_app.Controllers;
 
+import com.real_time.chat_app.Services.RoomPageService;
 import com.real_time.chat_app.Services.roomServices;
+import com.real_time.chat_app.anno.ActiveUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
 
 @RequiredArgsConstructor
 @RestController
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class homeController {
 
     private final roomServices roomService;
+    private final RoomPageService roomPageService;
 
     @GetMapping("/home")
     public ResponseEntity<?> homePage(
@@ -23,4 +25,11 @@ public class homeController {
     ){
         return ResponseEntity.ok(roomService.getSortedPage(size , number , sortBy));
     }
+
+    @PostMapping("/ret-rooms")
+    @ActiveUser
+    public ResponseEntity<?> getHomePageResponse(Principal principal){
+        return ResponseEntity.status(200).body(roomPageService.extractAllRooms(principal.getName()));
+    }
+
 }

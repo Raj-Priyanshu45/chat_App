@@ -2,6 +2,7 @@ package com.real_time.chat_app.Services;
 
 import com.real_time.chat_app.DTOs.ProfileResponse;
 import com.real_time.chat_app.DTOs.UserBrief;
+import com.real_time.chat_app.DTOs.UserProfileResponse;
 import com.real_time.chat_app.Models.UserExtras;
 import com.real_time.chat_app.Models.Users;
 import com.real_time.chat_app.Repo.ExtrasRepo;
@@ -84,5 +85,21 @@ public class ProfileService {
                         Users::getId,
                         u -> new UserBrief(u.getUsername(), images.get(u.getId()))
                 ));
+    }
+
+    public UserProfileResponse getUserProfile(String userId) {
+
+        Users user = userRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        UserExtras extras = extraRepo.findByUserId(userId).orElseThrow(
+                () -> new RuntimeException("Internal Server Error")
+        );
+
+        return new UserProfileResponse(
+                user.getUsername(),
+                user.getName(),
+                extras.getImageUri()
+        );
     }
 }

@@ -69,7 +69,7 @@ public class roomServices {
 
         if (room == null) return null;
 
-        if (room.getScopeVar() == ScopeVar.Private) {
+        if (room.getScopeVar() == ScopeVar.Private && !memberRepo.existsByRoomIdAndUserIdAndLeftAtIsNull(roomInfo.roomId() , userId)) {
             if (!Objects.equals(room.getPassword(), roomInfo.password())) {
                 throw new RuntimeException("Invalid Room Id or Password");
             }

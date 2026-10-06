@@ -8,9 +8,7 @@ import com.real_time.chat_app.jwt.JwtCreation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.Map;
@@ -39,5 +37,11 @@ public class ProfileController {
     @GetMapping("/ws-ticket")
     public ResponseEntity<?> wsTicket(Principal principal) {
         return ResponseEntity.ok(Map.of("ticket", jwtCreation.generateWsTicket(principal.getName())));
+    }
+
+    @ActiveUser
+    @GetMapping("/get-details/{userId}")
+    public ResponseEntity<?> getOthersProfile(@PathVariable String userId){
+        return ResponseEntity.status(200).body(profileService.getUserProfile(userId));
     }
 }
