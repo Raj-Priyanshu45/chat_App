@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { Analytics } from '@vercel/analytics/react';
 import JoinCreateChat from './components/JoinCreateChat';
 import ChatPage from './components/ChatPage';
 import DiscoverRooms from './components/DiscoverRooms';
@@ -53,6 +54,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Routes>
+          <Analytics />
         </BrowserRouter>
       </ChatProvider>
   );
