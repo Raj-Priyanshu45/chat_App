@@ -15,7 +15,7 @@ const AppNav = ({ active = 'home' }) => {
       <NavLink to="/" className="brand-lockup" aria-label="Go to home">
         <span className="brand-mark" aria-hidden="true">co</span>
         <span className="brand-copy">
-          <span className="brand-name">conduit</span>
+          <span className="brand-name">ChatCom</span>
           <span className="brand-subtitle">real-time workspace</span>
         </span>
       </NavLink>

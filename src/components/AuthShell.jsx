@@ -37,7 +37,7 @@ const AuthShell = ({ title, subtitle, children, footer, mode = 'auth' }) => (
         </div>
 
         <div className="auth-brand-bottom">
-          <div>conduit / realtime communication</div>
+          <div>ChatCom / realtime communication</div>
           <div>rooms · people · messages</div>
         </div>
       </section>

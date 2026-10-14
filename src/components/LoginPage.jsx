@@ -53,7 +53,7 @@ const LoginPage = () => {
       subtitle="Sign in and get back into the conversation."
       footer={
         <>
-          New to conduit?{' '}
+          New to ChatCom?{' '}
           <Link to="/register" className="auth-link">Create an account</Link>
         </>
       }
