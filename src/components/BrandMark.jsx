@@ -1,5 +1,5 @@
 const BrandMark = ({ compact = false }) => (
-  <span className="brand-lockup" aria-label="Conduit">
+  <span className="brand-lockup" aria-label="ChatCom">
     <span className="brand-mark" aria-hidden="true">co</span>
     {!compact && (
       <span className="brand-copy">
