@@ -60,11 +60,11 @@ const RegisterPage = () => {
       <form className="auth-form" onSubmit={handleSubmit}>
         <label className="field">
           <span className="field-label">Full name</span>
-          <input name="name" value={form.name} onChange={handleChange} autoComplete="name" placeholder="Priyanshu Raj" autoFocus />
+          <input name="name" value={form.name} onChange={handleChange} autoComplete="name" placeholder="Enter your full name" autoFocus />
         </label>
         <label className="field">
           <span className="field-label">Username</span>
-          <input name="username" value={form.username} onChange={handleChange} autoComplete="username" placeholder="priyanshu" />
+          <input name="username" value={form.username} onChange={handleChange} autoComplete="username" placeholder="Choose a username" />
         </label>
         <label className="field">
           <span className="field-label">Email</span>
