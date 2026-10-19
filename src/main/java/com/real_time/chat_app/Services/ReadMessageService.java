@@ -1,15 +1,22 @@
+
 package com.real_time.chat_app.Services;
 
+import com.mongodb.client.result.UpdateResult;
+import com.real_time.chat_app.DTOs.ReadMessageResponse;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.RoomMember;
-import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Repo.MemberRepo;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.roomRepo;
-import com.real_time.chat_app.enums.MessRead;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
@@ -21,45 +28,120 @@ public class ReadMessageService {
     private final roomRepo roomRepo;
     private final MemberRepo memberRepo;
     private final MessRepo messRepo;
+    private final MongoTemplate mongoTemplate;
 
-    public MessRead readMessStatus(String roomId, String userId, String readMessId) {
+    public ReadMessageResponse readMessStatus(
+            String roomId,
+            String userId,
+            String readMessId
+    ) {
 
-        Rooms room = roomRepo.findByRoomId(roomId).orElse(null);
-
-        if(room == null) {
-            log.warn("Invalid Room Request by userId {} to roomId {}",userId , roomId);
-            return MessRead.RoomNotFound;
+        // 1. Validate the room.
+        if (!roomRepo.existsByRoomId(roomId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room not found"
+            );
         }
 
-        RoomMember member = memberRepo.findByRoomIdAndUserIdAndLeftAtIsNull(roomId , userId).orElse(null);
+        // 2. Find active membership.
+        RoomMember member = memberRepo
+                .findByRoomIdAndUserIdAndLeftAtIsNull(roomId, userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "User is not an active member of this room"
+                ));
 
-        if(member == null){
-            log.warn("User {} does not belong to roomId {}", userId , roomId);
-            return MessRead.InvalidUser;
+        // 3. Find the requested message.
+        Message message = messRepo.findById(readMessId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Message not found"
+                ));
+
+        // 4. Prevent using a message from another room.
+        if (!roomId.equals(message.getRoomId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Message not found in this room"
+            );
         }
 
-        Message message = messRepo.findById(readMessId).orElse(null);
+        LocalDateTime messageTime = message.getTimeStamp();
 
-        if(message == null){
-            log.warn("Invalid mess request by userid-{}",userId);
-            return MessRead.MessNotFound;
+        if (messageTime == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Message timestamp is missing"
+            );
         }
 
-        if(member.getLastReadMessId().equals(readMessId)){
-            log.info("request repeated for reading mess with id {}",readMessId);
-            return MessRead.AlreadyRead;
+        // 5. Fast path: the pointer is already at or beyond
+        // the requested timestamp.
+        LocalDateTime currentTime = member.getLastReadMessageTime();
+
+        if (currentTime != null
+                && !messageTime.isAfter(currentTime)) {
+
+            return new ReadMessageResponse(
+                    member.getLastReadMessId(),
+                    currentTime,
+                    false
+            );
         }
 
-        if(member.getLastReadMessageTime().isBefore(LocalDateTime.now())){
-            log.info("Invalid request for updating mess prev time");
-            return MessRead.InvalidRequest;
+        // 6. Atomically advance the pointer only if the saved
+        // position is still older than the requested message.
+        Query query = new Query(
+                new Criteria().andOperator(
+                        Criteria.where("roomId").is(roomId),
+                        Criteria.where("userId").is(userId),
+                        Criteria.where("leftAt").is(null),
+                        new Criteria().orOperator(
+                                Criteria.where("lastReadMessageTime")
+                                        .is(null),
+                                Criteria.where("lastReadMessageTime")
+                                        .lt(messageTime)
+                        )
+                )
+        );
+
+        Update update = new Update()
+                .set("lastReadMessId", message.getId())
+                .set("lastReadMessageTime", messageTime);
+
+        UpdateResult result = mongoTemplate.updateFirst(
+                query,
+                update,
+                RoomMember.class
+        );
+
+        if (result.getModifiedCount() == 1) {
+            log.debug(
+                    "Read position advanced for user {} in room {} to message {}",
+                    userId, roomId, message.getId()
+            );
+
+            return new ReadMessageResponse(
+                    message.getId(),
+                    messageTime,
+                    true
+            );
         }
 
-        member.setLastReadMessId(readMessId);
-        member.setLastReadMessageTime(message.getTimeStamp());
+        // 7. Another request may have advanced the pointer first.
+        // Read the latest saved state instead of returning stale data.
+        RoomMember latestMember = memberRepo
+                .findByRoomIdAndUserIdAndLeftAtIsNull(roomId, userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "User is no longer an active member of this room"
+                ));
 
-        memberRepo.save(member);
-
-        return MessRead.Read;
+        return new ReadMessageResponse(
+                latestMember.getLastReadMessId(),
+                latestMember.getLastReadMessageTime(),
+                false
+        );
     }
 }
