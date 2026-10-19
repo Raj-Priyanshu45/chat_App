@@ -2,6 +2,7 @@ package com.real_time.chat_app.Models;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,11 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@CompoundIndex(
+        name = "room_user_unique" ,
+        def = "{'roomId':1 , 'userId':1}",
+        unique = true
+)
 public class RoomMember {
 
     @Id
@@ -23,4 +29,5 @@ public class RoomMember {
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
     private LocalDateTime lastReadMessageTime;
+    private String lastReadMessId;
 }
