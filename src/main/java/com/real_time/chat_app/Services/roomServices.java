@@ -109,29 +109,32 @@ public class roomServices {
 //            repo.save(room);
 //        }
 
-        RoomMember member = memberRepo.findByUserIdAndRoomId(userId , roomInfo.roomId()).orElse(null);
+        RoomMember member = memberRepo.findByUserIdAndRoomId(userId, roomInfo.roomId()).orElse(null);
+        boolean resetPointer = false;
 
-        if(member == null){
+        if (member == null) {
+
             member = RoomMember.builder()
                     .joinedAt(LocalDateTime.now())
                     .roomId(roomInfo.roomId())
                     .leftAt(null)
-                    .lastReadMessageTime(LocalDateTime.now())
                     .userId(userId)
                     .build();
+            resetPointer = true;
 
-            memberRepo.save(member);
-        } 
-
-        else if (member.getLeftAt() != null){
+        } else if (member.getLeftAt() != null) {
 
             member.setLeftAt(null);
             member.setJoinedAt(LocalDateTime.now());
+            resetPointer = true;
+
         }
 
-        memberRepo.save(member);
+        member = memberRepo.save(member);
 
-        initializeReadPointer(roomInfo.roomId(), member);
+        if (resetPointer) {
+            initializeReadPointer(roomInfo.roomId(), member);
+        }
 
         return room;
     }

@@ -166,11 +166,14 @@ public class ReadMessageService {
 
         LocalDateTime lastReadTime = roomMember.getLastReadMessageTime();
 
-        Query query = new Query(
-                Criteria.where("roomId").is(roomId)
-                        .and("timeStamp").gt(lastReadTime)
-        );
+        Criteria criteria = Criteria.where("roomId").is(roomId)
+                .and("del").is(false)
+                .and("sender").ne(userId);
 
-        return mongoTemplate.count(query, Message.class);
+        if (lastReadTime != null) {
+            criteria = criteria.and("timeStamp").gt(lastReadTime);
+        }
+
+        return mongoTemplate.count(new Query(criteria), Message.class);
     }
 }
