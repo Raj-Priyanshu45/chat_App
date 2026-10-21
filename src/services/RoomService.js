@@ -159,3 +159,28 @@ export const computeDmRoomId = (userA, userB) => {
       ? userA + userB
       : userB + userA;
 };
+
+// Mark a room message as read. The request property must match UpdateReadMessage.messId.
+export const markRoomReadApi = async (roomId, messId) => {
+  const response = await httpClient.patch(
+      `/api/v1/rooms/${encodeURIComponent(roomId)}/read`,
+      { messId }
+  );
+  return response.data;
+};
+
+// GET /api/v1/rooms/{roomId}/unread-count -> { unreadCount }
+export const getUnreadCountApi = async (roomId) => {
+  const response = await httpClient.get(
+      `/api/v1/rooms/${encodeURIComponent(roomId)}/unread-count`
+  );
+  return response.data?.unreadCount ?? 0;
+};
+
+// GET /api/v1/messages/{messageId}/read-receipts -> { messageId, readerIds, readCount, totalRecipients }
+export const getMessageReadReceiptsApi = async (messageId) => {
+  const response = await httpClient.get(
+      `/api/v1/messages/${encodeURIComponent(messageId)}/read-receipts`
+  );
+  return response.data;
+};

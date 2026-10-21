@@ -1,10 +1,12 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { fetchWsTicketApi } from '../services/ProfileService';
 import Avatar from './Avatar';
 import { useAvatars } from '../hooks/useAvatars';
@@ -25,6 +27,7 @@ import {
   MdDelete,
   MdCheck,
   MdClose,
+  MdVisibility,
 } from 'react-icons/md';
 
 import useChatContext from '../context/ChatContext';
@@ -40,6 +43,8 @@ import {
   uploadDmFileApi,
   computeDmRoomId,
   getRoomMembersApi,
+  getUnreadCountApi,
+  getMessageReadReceiptsApi,
 } from '../services/RoomService';
 
 import { lookupUsernamesApi } from '../services/UserService';
@@ -47,7 +52,9 @@ import { lookupUsernamesApi } from '../services/UserService';
 import {
   formatTime,
   toBackendTimestamp,
+  toEpoch,
 } from '../config/helper';
+import { useReadTracking } from '../hooks/useReadTracking';
 
 import MediaMessage from './MediaMessage';
 import MembersModal from './MembersModal';
@@ -112,6 +119,10 @@ const ChatPage = () => {
   const [showMembers, setShowMembers] = useState(false);
   const [profileUserId, setProfileUserId] = useState(null);
   const [memberIds, setMemberIds] = useState([]);
+  const [unreadMarker, setUnreadMarker] = useState(null);
+  const [newBelow, setNewBelow] = useState(0);
+  const [readReceipt, setReadReceipt] = useState(null);
+  const [receiptLoadingFor, setReceiptLoadingFor] = useState(null);
 
   // Inline edit state
   const [editingId, setEditingId] = useState(null);
@@ -124,8 +135,16 @@ const ChatPage = () => {
   const fileInputRef = useRef(null);
   const lastMessageTimestampRef = useRef(null);
   const prevLengthRef = useRef(0);
+  const stickRef = useRef(true);
+  const receiptRequestRef = useRef(0);
 
   const usernamesRef = useRef({});
+
+  const { markReady, noteOwnMessage, isReady } = useReadTracking({
+    roomId,
+    scrollRef: chatBoxRef,
+    messageCount: messages.length,
+  });
 
   const navigate = useNavigate();
 
@@ -285,6 +304,12 @@ const ChatPage = () => {
     setEditText('');
     setProfileUserId(null);
     setShowMembers(false);
+    setReadReceipt(null);
+    setReceiptLoadingFor(null);
+    receiptRequestRef.current += 1;
+    setUnreadMarker(null);
+    setNewBelow(0);
+    stickRef.current = true;
   }, [roomId]);
 
   const scrollToBottom = () => {
@@ -299,66 +324,84 @@ const ChatPage = () => {
   };
 
   /*
-   * Load message history.
+   * Load message history and unread count before enabling automatic read tracking.
    */
   useEffect(() => {
-    if (!connected || !roomId) {
-      return;
-    }
+    if (!connected || !roomId) return undefined;
 
     let cancelled = false;
 
     const loadMessages = async () => {
+      setUnreadMarker(null);
+      setNewBelow(0);
+      stickRef.current = true;
+
       try {
-        const loadedMessages =
-            await getMessages(roomId);
+        const loadedMessages = await getMessages(roomId);
+        if (cancelled) return;
 
-        if (cancelled) {
-          return;
+        // Fetch the unread count before any observer-triggered PATCH /read calls.
+        let unreadCount = 0;
+        try {
+          unreadCount = await getUnreadCountApi(roomId);
+        } catch {
+          // A newly opened DM may not exist yet. Keep the chat usable without the badge.
         }
+        if (cancelled) return;
 
-        setMessages(loadedMessages);
+        const unreadInLoadedPage = Math.min(Math.max(0, Number(unreadCount) || 0), loadedMessages.length);
+        const firstUnreadIndex = loadedMessages.length - unreadInLoadedPage;
+        const firstUnread = unreadInLoadedPage > 0 ? loadedMessages[firstUnreadIndex] : null;
+        const lastRead = firstUnreadIndex > 0 ? loadedMessages[firstUnreadIndex - 1] : null;
+
+        // Prevent the initial history render from being mistaken for new incoming messages.
+        prevLengthRef.current = loadedMessages.length;
+        flushSync(() => {
+          setMessages(loadedMessages);
+          setUnreadMarker(firstUnread?.id ? { id: firstUnread.id, count: Number(unreadCount) || unreadInLoadedPage } : null);
+        });
 
         if (loadedMessages.length > 0) {
-          lastMessageTimestampRef.current =
-              loadedMessages[
-              loadedMessages.length - 1
-                  ].timeStamp;
-
-          await resolveUsernames(
-              loadedMessages.map(
-                  (message) => message.sender
-              )
-          );
+          lastMessageTimestampRef.current = loadedMessages[loadedMessages.length - 1].timeStamp;
+        } else {
+          lastMessageTimestampRef.current = null;
         }
 
-        scrollToBottom();
+        const box = chatBoxRef.current;
+        if (box) {
+          const firstUnreadElement = firstUnread?.id
+              ? box.querySelector(`[data-mid="${CSS.escape(firstUnread.id)}"]`)
+              : null;
+
+          if (firstUnreadElement) {
+            firstUnreadElement.scrollIntoView({ block: 'start' });
+            stickRef.current = false;
+          } else {
+            box.scrollTop = box.scrollHeight;
+            stickRef.current = true;
+          }
+        }
+
+        markReady(lastRead);
+
+        if (loadedMessages.length > 0) {
+          await resolveUsernames(loadedMessages.map((message) => message.sender));
+        }
       } catch (error) {
-        if (
-            isDm &&
-            error?.response?.status === 404
-        ) {
+        if (cancelled) return;
+        if (isDm && error?.response?.status === 404) {
+          prevLengthRef.current = 0;
           setMessages([]);
+          markReady(null);
           return;
         }
-
-        toast.error(
-            'Unable to load message history.'
-        );
+        toast.error('Unable to load message history.');
       }
     };
 
-    loadMessages();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    connected,
-    roomId,
-    isDm,
-    resolveUsernames,
-  ]);
+    void loadMessages();
+    return () => { cancelled = true; };
+  }, [connected, roomId, isDm, resolveUsernames, markReady]);
 
   /*
    * STOMP connection.
@@ -421,8 +464,6 @@ const ChatPage = () => {
 
                   lastMessageTimestampRef.current =
                       payload.timeStamp;
-
-                  scrollToBottom();
                 } catch {
                   toast.error(
                       'Error receiving message'
@@ -498,8 +539,6 @@ const ChatPage = () => {
 
                   lastMessageTimestampRef.current =
                       payload.timeStamp;
-
-                  scrollToBottom();
                 } else if (senderId !== currentUserId) {
                   toast.custom((t) => (
                       <div
@@ -644,8 +683,6 @@ const ChatPage = () => {
                       ...newOnes,
                     ];
                   });
-
-                  scrollToBottom();
                 })
                 .catch(() => {
                   if (!isDmRef.current) {
@@ -707,15 +744,37 @@ const ChatPage = () => {
   ]);
 
   /*
-   * Scroll only when a message is ADDED
-   * (edits and deletes must not jump the view).
+   * New messages scroll only when the user was already at the bottom.
+   * Own messages keep the sender's local pointer synchronized.
    */
   useEffect(() => {
-    if (messages.length > prevLengthRef.current) {
-      scrollToBottom();
-    }
+    const added = messages.length - prevLengthRef.current;
     prevLengthRef.current = messages.length;
-  }, [messages.length]);
+
+    if (added <= 0 || !isReady()) return;
+
+    const lastMessage = messages[messages.length - 1];
+    const isOwnMessage = lastMessage?.sender === currentUserId;
+
+    if (isOwnMessage) noteOwnMessage(lastMessage);
+
+    if (isOwnMessage || stickRef.current) {
+      stickRef.current = true;
+      setNewBelow(0);
+      scrollToBottom();
+    } else {
+      setNewBelow((count) => count + added);
+    }
+  }, [messages.length, currentUserId, isReady, noteOwnMessage]);
+
+  const handleScroll = () => {
+    const box = chatBoxRef.current;
+    if (!box) return;
+
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    stickRef.current = nearBottom;
+    if (nearBottom) setNewBelow(0);
+  };
 
   /*
    * Send message.
@@ -962,6 +1021,52 @@ const ChatPage = () => {
     setConnected(true);
   };
 
+  const openReadReceipts = async (message) => {
+    if (!message?.realId || message.sender !== currentUserId) return;
+
+    const requestNumber = ++receiptRequestRef.current;
+    setReceiptLoadingFor(message.realId);
+    setReadReceipt({
+      messageId: message.realId,
+      readerIds: [],
+      readers: [],
+      readCount: 0,
+      totalRecipients: 0,
+      loading: true,
+    });
+
+    try {
+      const response = await getMessageReadReceiptsApi(message.realId);
+      const readerIds = Array.isArray(response?.readerIds) ? response.readerIds : [];
+      const namesById = await resolveUsernames(readerIds);
+      if (requestNumber !== receiptRequestRef.current) return;
+
+      setReadReceipt({
+        ...response,
+        readerIds,
+        readers: readerIds.map((id) => ({
+          id,
+          username: namesById[id] || 'Unknown user',
+        })),
+        loading: false,
+      });
+    } catch (error) {
+      if (requestNumber === receiptRequestRef.current) {
+        setReadReceipt(null);
+        const responseMessage = error?.response?.data?.message || error?.response?.data;
+        toast.error(typeof responseMessage === 'string' ? responseMessage : 'Unable to load read receipts.');
+      }
+    } finally {
+      if (requestNumber === receiptRequestRef.current) setReceiptLoadingFor(null);
+    }
+  };
+
+  const closeReadReceipts = () => {
+    receiptRequestRef.current += 1;
+    setReadReceipt(null);
+    setReceiptLoadingFor(null);
+  };
+
   /*
    * Members shown in modal:
    * {
@@ -1036,106 +1141,194 @@ const ChatPage = () => {
   ]);
 
   return (
-    <div className="chat-page page-enter">
-      <aside className="chat-rail">
-        <div className="chat-rail-top">
-          <button type="button" className="icon-button" onClick={() => navigate('/')} title="Home" aria-label="Home">
-            <span className="brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}>co</span>
-          </button>
-          {!isDm && <button type="button" className="icon-button" onClick={openMembers} title="Members" aria-label="Members"><MdGroup size={18} /></button>}
-          <button type="button" className="icon-button" onClick={() => navigate('/discover')} title="Discover rooms" aria-label="Discover rooms"><MdExplore size={18} /></button>
-          <button type="button" className="icon-button" onClick={() => navigate('/profile')} title="Profile" aria-label="Profile"><MdPerson size={18} /></button>
-          <span className="chat-rail-label">live workspace</span>
-        </div>
-        <button type="button" className="icon-button" onClick={handleLogout} title="Log out" aria-label="Log out"><MdLogout size={18} /></button>
-      </aside>
-
-      {showMembers && <MembersModal members={memberViewModels} onMessagePrivately={handleStartDm} onViewProfile={setProfileUserId} onClose={() => setShowMembers(false)} />}
-      {profileUserId && (
-        <UserProfileModal
-          userId={profileUserId}
-          onMessage={(id) => { setProfileUserId(null); setShowMembers(false); handleStartDm(id); }}
-          onClose={() => setProfileUserId(null)}
-        />
-      )}
-
-      <section className="chat-workspace">
-        <header className="chat-header">
-          <div className="chat-header-main">
-            <div className="chat-header-kicker">{isDm ? 'direct conversation' : 'live room'}</div>
-            <div className="chat-header-title">{isDm ? <><span>@</span>{dmTargetUsername}</> : <><span>#</span>{roomId}</>}</div>
+      <div className="chat-page page-enter">
+        <aside className="chat-rail">
+          <div className="chat-rail-top">
+            <button type="button" className="icon-button" onClick={() => navigate('/')} title="Home" aria-label="Home">
+              <span className="brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}>co</span>
+            </button>
+            {!isDm && <button type="button" className="icon-button" onClick={openMembers} title="Members" aria-label="Members"><MdGroup size={18} /></button>}
+            <button type="button" className="icon-button" onClick={() => navigate('/discover')} title="Discover rooms" aria-label="Discover rooms"><MdExplore size={18} /></button>
+            <button type="button" className="icon-button" onClick={() => navigate('/profile')} title="Profile" aria-label="Profile"><MdPerson size={18} /></button>
+            <span className="chat-rail-label">live workspace</span>
           </div>
-          <div className="chat-header-actions">
-            {connected && <div className="connection-pill"><span className="live-dot" /> Connected</div>}
-            {!isDm && <button type="button" className="btn btn-secondary" onClick={openMembers}><MdGroup size={16} /> Members</button>}
-            <button type="button" className="icon-button" onClick={handleLeaveRoom} title={isDm ? 'Close conversation' : 'Leave room'} aria-label={isDm ? 'Close conversation' : 'Leave room'}><MdClose size={18} /></button>
-          </div>
-        </header>
+          <button type="button" className="icon-button" onClick={handleLogout} title="Log out" aria-label="Log out"><MdLogout size={18} /></button>
+        </aside>
 
-        <main ref={chatBoxRef} className="chat-scroll" aria-label="Messages">
-          <div className="chat-inner">
-            {groupedMessages.length === 0 ? (
-              <div className="chat-empty">
-                <div className="chat-empty-inner">
-                  <div className="chat-empty-glyph"><MdChatBubbleOutline size={28} /></div>
-                  <h1 className="chat-empty-title">Start the conversation</h1>
-                  <p className="chat-empty-copy">{isDm ? `You and @${dmTargetUsername} have not exchanged a message here yet.` : 'This room is quiet right now. Send the first message and give the room a pulse.'}</p>
+        {showMembers && <MembersModal members={memberViewModels} onMessagePrivately={handleStartDm} onViewProfile={setProfileUserId} onClose={() => setShowMembers(false)} />}
+        {profileUserId && (
+            <UserProfileModal
+                userId={profileUserId}
+                onMessage={(id) => { setProfileUserId(null); setShowMembers(false); handleStartDm(id); }}
+                onClose={() => setProfileUserId(null)}
+            />
+        )}
+
+        {readReceipt && (
+            <div className="read-receipt-overlay" role="presentation" onClick={closeReadReceipts}>
+              <section
+                  className="read-receipt-dialog"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="read-receipt-title"
+                  onClick={(event) => event.stopPropagation()}
+              >
+                <div className="read-receipt-header">
+                  <div>
+                    <div className="page-kicker">message details</div>
+                    <h2 id="read-receipt-title" className="read-receipt-title">Read receipts</h2>
+                    <p className="read-receipt-summary">
+                      {readReceipt.loading
+                          ? 'Loading readers…'
+                          : `Read by ${readReceipt.readCount ?? readReceipt.readers?.length ?? 0} of ${readReceipt.totalRecipients ?? 0} active recipients`}
+                    </p>
+                  </div>
+                  <button type="button" className="icon-button" onClick={closeReadReceipts} aria-label="Close read receipts" title="Close">
+                    <MdClose size={18} />
+                  </button>
                 </div>
-              </div>
-            ) : (
-              groupedMessages.map((message) => {
-                const isOwn = message.sender === currentUserId;
-                const isTextMessage = !message.type || message.type === 'TEXT';
-                const isEditing = editingId !== null && editingId === message.realId;
-                const canModify = isOwn && Boolean(message.realId) && !isEditing;
-                return (
-                  <article key={message.id} className="message-row">
-                    <div className="message-avatar"><Avatar src={avatarOf(message.sender)} name={message.displaySender} size={36} /></div>
-                    <div className="message-content">
-                      <div className="message-meta">
-                        <span className={`message-author ${isOwn ? 'is-self' : ''}`}>{message.displaySender}</span>
-                        <span className="message-time">{formatTime(message.timeStamp)}</span>
-                        {message.edited && <span className="message-edited">edited</span>}
-                      </div>
-                      {isEditing ? (
-                        <div>
-                          <div className="message-edit-shell">
-                            <input autoFocus value={editText} onChange={(event) => setEditText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submitEdit(); } else if (event.key === 'Escape') cancelEdit(); }} />
-                            <button type="button" className="icon-button" onClick={submitEdit} title="Save edit" aria-label="Save edit"><MdCheck size={17} /></button>
-                            <button type="button" className="icon-button" onClick={cancelEdit} title="Cancel edit" aria-label="Cancel edit"><MdClose size={17} /></button>
-                          </div>
-                          <p className="message-edit-help">Enter to save · Esc to cancel</p>
-                        </div>
-                      ) : message.type === 'IMAGE' || message.type === 'VIDEO' || message.type === 'AUDIO' ? (
-                        <div style={{ marginTop: 7 }}><MediaMessage url={message.content} type={message.type} /></div>
-                      ) : (
-                        <p className="message-body">{message.content}</p>
-                      )}
-                    </div>
-                    {canModify && (
-                      <div className="message-actions">
-                        {isTextMessage && <button type="button" className="message-action" onClick={() => startEdit(message)} title="Edit message" aria-label="Edit message"><MdEdit size={15} /></button>}
-                        <button type="button" className="message-action is-danger" onClick={() => deleteMessage(message)} title="Delete message" aria-label="Delete message"><MdDelete size={15} /></button>
-                      </div>
-                    )}
-                  </article>
-                );
-              })
-            )}
-          </div>
-        </main>
 
-        <footer className="composer-wrap">
-          <div className="composer">
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,audio/*" multiple />
-            <button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} title="Attach media" aria-label="Attach media"><MdAttachFile size={18} /></button>
-            <input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') sendMessage(); }} placeholder={isDm ? `Message @${dmTargetUsername}` : `Message #${roomId}`} aria-label="Message" />
-            <button type="button" className="btn btn-primary" onClick={sendMessage} disabled={!input.trim()} title="Send message"><MdSend size={18} /><span className="hidden sm:inline">Send</span></button>
-          </div>
-          <div className="composer-note"><span>media supported · image / video / audio</span><span>enter to send</span></div>
-        </footer>
-      </section>
-    </div>
+                {readReceipt.loading ? (
+                    <div className="read-receipt-empty">Loading reader list…</div>
+                ) : readReceipt.readers?.length ? (
+                    <ul className="read-receipt-list">
+                      {readReceipt.readers.map((reader) => (
+                          <li key={reader.id} className="read-receipt-reader">
+                    <span className="read-receipt-avatar" aria-hidden="true">
+                      {(reader.username?.[0] || '?').toUpperCase()}
+                    </span>
+                            <span className="read-receipt-username">@{reader.username}</span>
+                            <span className="read-receipt-status">Read</span>
+                          </li>
+                      ))}
+                    </ul>
+                ) : (
+                    <div className="read-receipt-empty">
+                      {(readReceipt.totalRecipients ?? 0) === 0
+                          ? 'There are no other active recipients in this room.'
+                          : 'Nobody has read this message yet.'}
+                    </div>
+                )}
+              </section>
+            </div>
+        )}
+
+        <section className="chat-workspace">
+          <header className="chat-header">
+            <div className="chat-header-main">
+              <div className="chat-header-kicker">{isDm ? 'direct conversation' : 'live room'}</div>
+              <div className="chat-header-title">{isDm ? <><span>@</span>{dmTargetUsername}</> : <><span>#</span>{roomId}</>}</div>
+            </div>
+            <div className="chat-header-actions">
+              {connected && <div className="connection-pill"><span className="live-dot" /> Connected</div>}
+              {!isDm && <button type="button" className="btn btn-secondary" onClick={openMembers}><MdGroup size={16} /> Members</button>}
+              <button type="button" className="icon-button" onClick={handleLeaveRoom} title={isDm ? 'Close conversation' : 'Leave room'} aria-label={isDm ? 'Close conversation' : 'Leave room'}><MdClose size={18} /></button>
+            </div>
+          </header>
+
+          <main ref={chatBoxRef} className="chat-scroll" aria-label="Messages" onScroll={handleScroll}>
+            <div className="chat-inner">
+              {groupedMessages.length === 0 ? (
+                  <div className="chat-empty">
+                    <div className="chat-empty-inner">
+                      <div className="chat-empty-glyph"><MdChatBubbleOutline size={28} /></div>
+                      <h1 className="chat-empty-title">Start the conversation</h1>
+                      <p className="chat-empty-copy">{isDm ? `You and @${dmTargetUsername} have not exchanged a message here yet.` : 'This room is quiet right now. Send the first message and give the room a pulse.'}</p>
+                    </div>
+                  </div>
+              ) : (
+                  groupedMessages.map((message) => {
+                    const isOwn = message.sender === currentUserId;
+                    const isTextMessage = !message.type || message.type === 'TEXT';
+                    const isEditing = editingId !== null && editingId === message.realId;
+                    const canModify = isOwn && Boolean(message.realId) && !isEditing;
+                    return (
+                        <Fragment key={message.id}>
+                          {message.realId && unreadMarker?.id === message.realId && (
+                              <div className="unread-divider" role="separator">
+                                <span>{unreadMarker.count} new message{unreadMarker.count === 1 ? '' : 's'}</span>
+                              </div>
+                          )}
+                          <article
+                              className="message-row"
+                              data-mid={message.realId || undefined}
+                              data-ts={message.realId ? toEpoch(message.timeStamp) : undefined}
+                          >
+                            <div className="message-avatar"><Avatar src={avatarOf(message.sender)} name={message.displaySender} size={36} /></div>
+                            <div className="message-content">
+                              <div className="message-meta">
+                                <span className={`message-author ${isOwn ? 'is-self' : ''}`}>{message.displaySender}</span>
+                                <span className="message-time">{formatTime(message.timeStamp)}</span>
+                                {message.edited && <span className="message-edited">edited</span>}
+                                {isOwn && message.realId && (
+                                    <button
+                                        type="button"
+                                        className="message-read-receipts-button"
+                                        onClick={() => openReadReceipts(message)}
+                                        disabled={receiptLoadingFor === message.realId}
+                                        title="See who read this message"
+                                        aria-label="See who read this message"
+                                    >
+                                      <MdVisibility size={13} />
+                                      {receiptLoadingFor === message.realId ? 'Loading…' : 'Read receipts'}
+                                    </button>
+                                )}
+                              </div>
+                              {isEditing ? (
+                                  <div>
+                                    <div className="message-edit-shell">
+                                      <input autoFocus value={editText} onChange={(event) => setEditText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submitEdit(); } else if (event.key === 'Escape') cancelEdit(); }} />
+                                      <button type="button" className="icon-button" onClick={submitEdit} title="Save edit" aria-label="Save edit"><MdCheck size={17} /></button>
+                                      <button type="button" className="icon-button" onClick={cancelEdit} title="Cancel edit" aria-label="Cancel edit"><MdClose size={17} /></button>
+                                    </div>
+                                    <p className="message-edit-help">Enter to save · Esc to cancel</p>
+                                  </div>
+                              ) : message.type === 'IMAGE' || message.type === 'VIDEO' || message.type === 'AUDIO' ? (
+                                  <div style={{ marginTop: 7 }}><MediaMessage url={message.content} type={message.type} /></div>
+                              ) : (
+                                  <p className="message-body">{message.content}</p>
+                              )}
+                            </div>
+                            {canModify && (
+                                <div className="message-actions">
+                                  {isTextMessage && <button type="button" className="message-action" onClick={() => startEdit(message)} title="Edit message" aria-label="Edit message"><MdEdit size={15} /></button>}
+                                  <button type="button" className="message-action is-danger" onClick={() => deleteMessage(message)} title="Delete message" aria-label="Delete message"><MdDelete size={15} /></button>
+                                </div>
+                            )}
+                          </article>
+                        </Fragment>
+                    );
+                  })
+              )}
+            </div>
+          </main>
+
+          {newBelow > 0 && (
+              <button
+                  type="button"
+                  className="jump-latest"
+                  onClick={() => {
+                    scrollToBottom();
+                    stickRef.current = true;
+                    setNewBelow(0);
+                  }}
+              >
+                <MdVisibility size={16} />
+                {newBelow} new message{newBelow === 1 ? '' : 's'}
+              </button>
+          )}
+
+          <footer className="composer-wrap">
+            <div className="composer">
+              <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,audio/*" multiple />
+              <button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} title="Attach media" aria-label="Attach media"><MdAttachFile size={18} /></button>
+              <input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') sendMessage(); }} placeholder={isDm ? `Message @${dmTargetUsername}` : `Message #${roomId}`} aria-label="Message" />
+              <button type="button" className="btn btn-primary" onClick={sendMessage} disabled={!input.trim()} title="Send message"><MdSend size={18} /><span className="hidden sm:inline">Send</span></button>
+            </div>
+            <div className="composer-note"><span>media supported · image / video / audio</span><span>enter to send</span></div>
+          </footer>
+        </section>
+      </div>
   );
 };
 export default ChatPage;

@@ -58,6 +58,10 @@ const parseDateValue = (value) => {
 
   return null;
 };
+
+// Converts backend timestamp representations into epoch milliseconds.
+export const toEpoch = (value) => parseDateValue(value)?.getTime() ?? 0;
+
 export const formatTime = (value) => {
   const date = parseDateValue(value);
   if (!date) return '';
