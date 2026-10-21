@@ -23,6 +23,7 @@ public class ImageVideoService {
     private final SimpMessagingTemplate messagingTemplate;
     private final roomRepo roomRepo;
     private final Cloudinary cloudinary;
+    private final chatService chatService;
 
     private static final Set<String> extensions =
             Set.of("jpg", "jpeg", "gif", "png", "webp", "bmp");
@@ -290,6 +291,8 @@ public class ImageVideoService {
                                 type
                         )
                 );
+
+        chatService.advanceSenderReadPointer(room.getRoomId() , sender , saved);
 
         messagingTemplate.convertAndSend(
                 "/topic/room/" +

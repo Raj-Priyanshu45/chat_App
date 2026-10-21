@@ -5,6 +5,7 @@ import com.mongodb.client.result.UpdateResult;
 import com.real_time.chat_app.DTOs.ReadMessageResponse;
 import com.real_time.chat_app.Models.Message;
 import com.real_time.chat_app.Models.RoomMember;
+import com.real_time.chat_app.Models.Rooms;
 import com.real_time.chat_app.Repo.MemberRepo;
 import com.real_time.chat_app.Repo.MessRepo;
 import com.real_time.chat_app.Repo.roomRepo;
@@ -143,5 +144,33 @@ public class ReadMessageService {
                 latestMember.getLastReadMessageTime(),
                 false
         );
+    }
+
+    public long unreadMessCount(String roomId, String userId) {
+
+        if (!roomRepo.existsByRoomId(roomId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room Not Found"
+            );
+        }
+
+        RoomMember roomMember = memberRepo
+                .findByRoomIdAndUserIdAndLeftAtIsNull(roomId, userId)
+                .orElseThrow(
+                        () -> new ResponseStatusException(
+                                HttpStatus.FORBIDDEN,
+                                "User is not currently active member of the room"
+                        )
+                );
+
+        LocalDateTime lastReadTime = roomMember.getLastReadMessageTime();
+
+        Query query = new Query(
+                Criteria.where("roomId").is(roomId)
+                        .and("timeStamp").gt(lastReadTime)
+        );
+
+        return mongoTemplate.count(query, Message.class);
     }
 }

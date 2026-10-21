@@ -2,6 +2,7 @@
 package com.real_time.chat_app.Controllers;
 
 import com.real_time.chat_app.DTOs.ReadMessageResponse;
+import com.real_time.chat_app.DTOs.UnreadMessageResponse;
 import com.real_time.chat_app.DTOs.UpdateReadMessage;
 import com.real_time.chat_app.Services.ReadMessageService;
 import com.real_time.chat_app.anno.ActiveUser;
@@ -35,5 +36,20 @@ public class ReadMessController {
                 );
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/rooms/{roomId}/unread-count")
+    public ResponseEntity<UnreadMessageResponse> getUnreadMessageCount(
+            @PathVariable String roomId,
+            Principal principal
+    ) {
+        long unreadCount = readMessageService.unreadMessCount(
+                roomId,
+                principal.getName()
+        );
+
+        return ResponseEntity.ok(
+                new UnreadMessageResponse(unreadCount)
+        );
     }
 }

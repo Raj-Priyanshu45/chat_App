@@ -7,8 +7,14 @@ import com.real_time.chat_app.enums.Content_Type;
 import com.real_time.chat_app.enums.ScopeVar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +31,7 @@ public class chatService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ExtrasRepo extraRepo;
     private final MemberRepo memberRepo;
+    private final MongoTemplate mongoTemplate;
 
     public Message sendMessage(MessageRequest request, String roomId, String userId) {
 
@@ -46,8 +53,11 @@ public class chatService {
                 .timeStamp(LocalDateTime.now())
                 .type(Content_Type.TEXT)
                 .build();
+        messRepo.save(mess);
 
-        return messRepo.save(mess);
+        advanceSenderReadPointer(roomId , userId , mess);
+
+        return mess;
     }
 
     public Message sendDm(String user1, MessageRequest request, String user2) {
@@ -135,6 +145,8 @@ public class chatService {
 
         Message saved = messRepo.save(message);
 
+        advanceSenderReadPointer(roomId , user1 , message);
+
         messagingTemplate.convertAndSendToUser(
                 user1,
                 "/queue/dm",
@@ -152,5 +164,35 @@ public class chatService {
 
     private String getDmRoomId(String user1, String user2) {
         return user1.compareTo(user2) < 0 ? user1 + user2 : user2 + user1;
+    }
+
+    public void advanceSenderReadPointer(String roomId, String userId, Message message) {
+
+        LocalDateTime messageTime = message.getTimeStamp();
+
+        if (messageTime == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Message timestamp is missing"
+            );
+        }
+
+        Query query = new Query(
+                new Criteria().andOperator(
+                        Criteria.where("roomId").is(roomId),
+                        Criteria.where("userId").is(userId),
+                        Criteria.where("leftAt").is(null),
+                        new Criteria().orOperator(
+                                Criteria.where("lastReadMessageTime").is(null),
+                                Criteria.where("lastReadMessageTime").lt(messageTime)
+                        )
+                )
+        );
+
+        Update update = new Update()
+                .set("lastReadMessId", message.getId())
+                .set("lastReadMessageTime", messageTime);
+
+        mongoTemplate.updateFirst(query, update, RoomMember.class);
     }
 }

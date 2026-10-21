@@ -23,6 +23,7 @@ public class DmFileUploadService {
     private final SimpMessagingTemplate messagingTemplate;
     private final roomRepo roomRepo;
     private final Cloudinary cloudinary;
+    private final chatService chatService;
 
     private final static Set<String> extensions = Set.of("jpg", "jpeg", "gif", "png");
     private final static long maxImageSize = 5 * 1024 * 1024L;
@@ -167,6 +168,8 @@ public class DmFileUploadService {
                 "/queue/dm",
                 saved
         );
+
+        chatService.advanceSenderReadPointer(roomId , sender , saved);
 
         return saved;
     }

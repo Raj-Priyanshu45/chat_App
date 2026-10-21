@@ -10,6 +10,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -30,6 +33,7 @@ public class roomServices {
     private final UserRepo userRepo;
     private final ExtrasRepo extraRepo;
     private final MemberRepo memberRepo;
+    private final MongoTemplate mongoTemplate;
 
     public Rooms createRoom(@Valid roomId roomId, String userId) {
 
@@ -52,7 +56,8 @@ public class roomServices {
                 .userId(userId)
                 .roomId(roomId.roomId())
                 .leftAt(null)
-                .lastReadMessageTime(LocalDateTime.now())
+                .lastReadMessageTime(null)
+                .lastReadMessId(null)
                 .joinedAt(LocalDateTime.now())
                 .build();
 
@@ -125,6 +130,8 @@ public class roomServices {
         }
 
         memberRepo.save(member);
+
+        initializeReadPointer(roomInfo.roomId(), member);
 
         return room;
     }
@@ -236,5 +243,27 @@ public class roomServices {
             log.warn("Non-member {} tried to read room {}", userId, roomId);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this room");
         }
+    }
+
+    public RoomMember initializeReadPointer(String roomId, RoomMember member) {
+
+        Query query = new Query(
+                Criteria.where("roomId").is(roomId)
+        );
+
+        query.with(Sort.by(Sort.Direction.DESC, "timeStamp"));
+        query.limit(1);
+
+        Message latestMessage = mongoTemplate.findOne(query, Message.class);
+
+        if (latestMessage != null) {
+            member.setLastReadMessId(latestMessage.getId());
+            member.setLastReadMessageTime(latestMessage.getTimeStamp());
+        } else {
+            member.setLastReadMessId(null);
+            member.setLastReadMessageTime(null);
+        }
+
+        return memberRepo.save(member);
     }
 }

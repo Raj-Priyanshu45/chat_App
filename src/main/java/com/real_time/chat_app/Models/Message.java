@@ -3,6 +3,7 @@ package com.real_time.chat_app.Models;
 import com.real_time.chat_app.enums.Content_Type;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -13,6 +14,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Document(collection = "messages")
+@CompoundIndex(
+        name = "mess_stamp" ,
+        def = "{'timeStamp':1 , 'roomId':1}"
+)
 public class Message {
 
     @Id
