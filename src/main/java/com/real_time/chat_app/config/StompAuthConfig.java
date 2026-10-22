@@ -22,6 +22,9 @@ public class StompAuthConfig implements ChannelInterceptor {
 
     private static final String TOPIC_PREFIX = "/topic/room/";
     private static final String SEND_PREFIX = "/app/sendMessages/";
+    private static final String TYPING_PREFIX = "/app/chat/typing/";
+    private static final String REACTION_PREFIX = "/app/chat/reaction/";
+    private static final String PRESENCE_PREFIX = "/app/chat/presence/";
 
     private final roomRepo roomRepo;
     private final MemberRepo memberRepo;
@@ -62,8 +65,9 @@ public class StompAuthConfig implements ChannelInterceptor {
 
     private String roomIdFrom(String destination) {
         if (destination == null) return null;
-        if (destination.startsWith(TOPIC_PREFIX)) return destination.substring(TOPIC_PREFIX.length());
-        if (destination.startsWith(SEND_PREFIX)) return destination.substring(SEND_PREFIX.length());
+        for (String prefix : new String[]{TOPIC_PREFIX, SEND_PREFIX, TYPING_PREFIX, REACTION_PREFIX, PRESENCE_PREFIX}) {
+            if (destination.startsWith(prefix)) return destination.substring(prefix.length());
+        }
         return null;
     }
 }

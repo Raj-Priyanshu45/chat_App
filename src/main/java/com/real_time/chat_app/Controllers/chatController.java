@@ -15,10 +15,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.handler.annotation.DestinationVariable;
-import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.handler.annotation.*;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -45,7 +42,7 @@ public class chatController {
     @SendTo("/topic/room/{roomId}")
     public Message sendMessage(
             @DestinationVariable String roomId,
-            @RequestBody MessageRequest request,
+            @Payload MessageRequest request,
             Principal principal
     ) {
         return chatService.sendMessage(request, roomId, principal.getName());
@@ -54,7 +51,7 @@ public class chatController {
     @MessageMapping("/dm/{username}")
     public Message dmMessage(
             @DestinationVariable String username ,
-            @RequestBody MessageRequest request ,
+            @Payload MessageRequest request ,
             Principal principal
     ){
         return chatService.sendDm(principal.getName() , request , username);
@@ -116,12 +113,12 @@ public class chatController {
 
 
     @MessageMapping("chat/del")
-    public void delMessage(MessDelRequest req , Principal principal){
+    public void delMessage(@Payload MessDelRequest req , Principal principal){
         messDelService.delMessage(principal.getName(), req.messId() , req.roomId());
     }
 
     @MessageMapping("chat/edit")
-    public void editMessage(MessEditRequest request , Principal principal){
+    public void editMessage(@Payload MessEditRequest request , Principal principal){
         messDelService.editMessage(principal.getName(), request.messId() , request.updatedContent(), request.roomId());
     }
 }
