@@ -9,6 +9,7 @@ import {
 import { flushSync } from 'react-dom';
 import { fetchWsTicketApi } from '../services/ProfileService';
 import Avatar from './Avatar';
+import ChatSidebar from './ChatSidebar';
 import { useAvatars } from '../hooks/useAvatars';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
@@ -28,6 +29,8 @@ import {
   MdCheck,
   MdClose,
   MdVisibility,
+  MdHome,
+  MdMeetingRoom,
 } from 'react-icons/md';
 
 import useChatContext from '../context/ChatContext';
@@ -91,6 +94,13 @@ const applyMessageEvent = (payload, setMessages) => {
   return false;
 };
 
+const dispatchUnreadUpdate = (detail) => {
+  if (typeof window === 'undefined') return;
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('chatcom:unread-updated', { detail }));
+  }, 0);
+};
+
 const ChatPage = () => {
   const {
     roomId,
@@ -103,6 +113,7 @@ const ChatPage = () => {
     setConnected,
     setRoomId,
     setCurrentUser,
+    setRoomUsers,
     setIsDm,
     setDmTarget,
   } = useChatContext();
@@ -123,6 +134,9 @@ const ChatPage = () => {
   const [newBelow, setNewBelow] = useState(0);
   const [readReceipt, setReadReceipt] = useState(null);
   const [receiptLoadingFor, setReceiptLoadingFor] = useState(null);
+  const [mobileRoomsOpen, setMobileRoomsOpen] = useState(() =>
+      !roomId && typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
+  );
 
   // Inline edit state
   const [editingId, setEditingId] = useState(null);
@@ -137,6 +151,12 @@ const ChatPage = () => {
   const prevLengthRef = useRef(0);
   const stickRef = useRef(true);
   const receiptRequestRef = useRef(0);
+  const messagesRef = useRef(messages);
+  const touchStartRef = useRef(null);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const usernamesRef = useRef({});
 
@@ -464,6 +484,7 @@ const ChatPage = () => {
 
                   lastMessageTimestampRef.current =
                       payload.timeStamp;
+                  dispatchUnreadUpdate({ roomId: payload.roomId || roomId, messageId: payload.id });
                 } catch {
                   toast.error(
                       'Error receiving message'
@@ -496,6 +517,10 @@ const ChatPage = () => {
                     applyMessageEvent(payload, setMessages);
                   }
                   return;
+                }
+
+                if (payload.roomId) {
+                  dispatchUnreadUpdate({ roomId: payload.roomId, messageId: payload.id });
                 }
 
                 const senderId =
@@ -1001,6 +1026,8 @@ const ChatPage = () => {
     }
 
     setMessages([]);
+    prevLengthRef.current = 0;
+    setRoomUsers([]);
 
     lastMessageTimestampRef.current =
         null;
@@ -1020,6 +1047,78 @@ const ChatPage = () => {
 
     setConnected(true);
   };
+
+  const openRoomFromSidebar = (targetRoomId) => {
+    if (!targetRoomId || !currentUserId) return;
+    if (!isDm && targetRoomId === roomId) {
+      setMobileRoomsOpen(false);
+      return;
+    }
+
+    if (stompClient) stompClient.deactivate();
+    setMessages([]);
+    prevLengthRef.current = 0;
+    lastMessageTimestampRef.current = null;
+    setCurrentUser(currentUserId);
+    setRoomUsers([]);
+    setIsDm(false);
+    setDmTarget('');
+    setRoomId(targetRoomId);
+    setConnected(true);
+    setMobileRoomsOpen(false);
+  };
+
+  const openDmFromSidebar = (targetUserId) => {
+    handleStartDm(targetUserId);
+    setMobileRoomsOpen(false);
+  };
+
+  const handleChatTouchStart = (event) => {
+    const touch = event.touches?.[0];
+    if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleChatTouchEnd = (event) => {
+    const start = touchStartRef.current;
+    const touch = event.changedTouches?.[0];
+    touchStartRef.current = null;
+    if (!start || !touch || window.innerWidth > 860) return;
+
+    const deltaX = touch.clientX - start.x;
+    const deltaY = Math.abs(touch.clientY - start.y);
+    if (start.x <= 24 && deltaX >= 90 && deltaY <= 64) {
+      setMobileRoomsOpen(true);
+    } else if (mobileRoomsOpen && start.x >= 40 && deltaX <= -90 && deltaY <= 64) {
+      setMobileRoomsOpen(false);
+    }
+  };
+
+  // Recalculate the divider after the server confirms a pointer advance. This
+  // removes the unread marker when the unread count reaches zero.
+  useEffect(() => {
+    const refreshUnreadMarker = async (event) => {
+      if (event.detail?.roomId !== roomId) return;
+
+      try {
+        const unreadCount = Math.max(0, Number(await getUnreadCountApi(roomId)) || 0);
+        const currentMessages = messagesRef.current;
+        if (unreadCount === 0 || currentMessages.length === 0) {
+          setUnreadMarker(null);
+          return;
+        }
+
+        const unreadInLoadedPage = Math.min(unreadCount, currentMessages.length);
+        const firstUnreadIndex = currentMessages.length - unreadInLoadedPage;
+        const firstUnread = currentMessages[firstUnreadIndex];
+        setUnreadMarker(firstUnread?.id ? { id: firstUnread.id, count: unreadCount } : null);
+      } catch {
+        // Preserve the last known divider if the network is temporarily unavailable.
+      }
+    };
+
+    window.addEventListener('chatcom:unread-updated', refreshUnreadMarker);
+    return () => window.removeEventListener('chatcom:unread-updated', refreshUnreadMarker);
+  }, [roomId]);
 
   const openReadReceipts = async (message) => {
     if (!message?.realId || message.sender !== currentUserId) return;
@@ -1141,11 +1240,11 @@ const ChatPage = () => {
   ]);
 
   return (
-      <div className="chat-page page-enter">
+      <div className="chat-page page-enter" onTouchStart={handleChatTouchStart} onTouchEnd={handleChatTouchEnd}>
         <aside className="chat-rail">
           <div className="chat-rail-top">
             <button type="button" className="icon-button" onClick={() => navigate('/')} title="Home" aria-label="Home">
-              <span className="brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}>co</span>
+              <span className="brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}>C</span>
             </button>
             {!isDm && <button type="button" className="icon-button" onClick={openMembers} title="Members" aria-label="Members"><MdGroup size={18} /></button>}
             <button type="button" className="icon-button" onClick={() => navigate('/discover')} title="Discover rooms" aria-label="Discover rooms"><MdExplore size={18} /></button>
@@ -1154,6 +1253,14 @@ const ChatPage = () => {
           </div>
           <button type="button" className="icon-button" onClick={handleLogout} title="Log out" aria-label="Log out"><MdLogout size={18} /></button>
         </aside>
+
+        <ChatSidebar
+            mobileOpen={mobileRoomsOpen}
+            onLogout={handleLogout}
+            onCloseMobile={() => setMobileRoomsOpen(false)}
+            onOpenRoom={openRoomFromSidebar}
+            onOpenDm={openDmFromSidebar}
+        />
 
         {showMembers && <MembersModal members={memberViewModels} onMessagePrivately={handleStartDm} onViewProfile={setProfileUserId} onClose={() => setShowMembers(false)} />}
         {profileUserId && (
@@ -1328,6 +1435,21 @@ const ChatPage = () => {
             <div className="composer-note"><span>media supported · image / video / audio</span><span>enter to send</span></div>
           </footer>
         </section>
+
+        <nav className="chat-mobile-tabs" aria-label="Primary navigation">
+          <button type="button" className="chat-mobile-tab" onClick={() => navigate('/')} aria-label="Home">
+            <MdHome size={20} /><span>Home</span>
+          </button>
+          <button type="button" className="chat-mobile-tab is-active" onClick={() => setMobileRoomsOpen(true)} aria-label="Rooms and direct messages">
+            <MdMeetingRoom size={20} /><span>Rooms</span>
+          </button>
+          <button type="button" className="chat-mobile-tab" onClick={() => navigate('/discover')} aria-label="Discover">
+            <MdExplore size={20} /><span>Discover</span>
+          </button>
+          <button type="button" className="chat-mobile-tab" onClick={() => navigate('/profile')} aria-label="Profile">
+            <MdPerson size={20} /><span>Profile</span>
+          </button>
+        </nav>
       </div>
   );
 };

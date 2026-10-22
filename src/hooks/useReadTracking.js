@@ -4,8 +4,18 @@ import { toEpoch } from '../config/helper';
 
 const DEBOUNCE_MS = 500;
 
-export const useReadTracking = ({ roomId, scrollRef, messageCount }) => {
+export const useReadTracking = ({
+                                    roomId,
+                                    scrollRef,
+                                    messageCount,
+                                    onReadPointerAdvanced,
+                                }) => {
     const roomRef = useRef(roomId);
+    const onReadPointerAdvancedRef = useRef(onReadPointerAdvanced);
+
+    useEffect(() => {
+        onReadPointerAdvancedRef.current = onReadPointerAdvanced;
+    }, [onReadPointerAdvanced]);
     const readyRef = useRef(false);
     const pointerRef = useRef({ id: null, ts: 0 });
     const pendingRef = useRef(null);
@@ -38,6 +48,10 @@ export const useReadTracking = ({ roomId, scrollRef, messageCount }) => {
                     ts: serverTs,
                 };
             }
+
+            // Re-fetch unread count only after the read update succeeds.
+            // ChatPage moves or removes the "N new messages" divider accordingly.
+            onReadPointerAdvancedRef.current?.(candidate);
         } catch {
             // Restore and retain the candidate so a later visibility change can retry it.
             if (roomRef.current === room && pointerRef.current.id === candidate.id) {
