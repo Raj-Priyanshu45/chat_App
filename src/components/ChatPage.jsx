@@ -61,6 +61,7 @@ import { useReadTracking } from '../hooks/useReadTracking';
 
 import MediaMessage from './MediaMessage';
 import MembersModal from './MembersModal';
+import ActionDialog from './ActionDialog';
 
 /*
  * Edit / delete events arrive on the same channels as normal messages
@@ -133,6 +134,8 @@ const ChatPage = () => {
   const [unreadMarker, setUnreadMarker] = useState(null);
   const [newBelow, setNewBelow] = useState(0);
   const [readReceipt, setReadReceipt] = useState(null);
+  const [receiptSummaryById, setReceiptSummaryById] = useState({});
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [receiptLoadingFor, setReceiptLoadingFor] = useState(null);
   const [mobileRoomsOpen, setMobileRoomsOpen] = useState(() =>
       !roomId && typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
@@ -147,6 +150,7 @@ const ChatPage = () => {
 
   const chatBoxRef = useRef(null);
   const fileInputRef = useRef(null);
+  const composerInputRef = useRef(null);
   const lastMessageTimestampRef = useRef(null);
   const prevLengthRef = useRef(0);
   const stickRef = useRef(true);
@@ -815,8 +819,9 @@ const ChatPage = () => {
       return;
     }
 
+    const messageText = input.trim();
     const payload = {
-      message: input.trim(),
+      message: messageText,
     };
 
     try {
@@ -830,6 +835,7 @@ const ChatPage = () => {
       });
 
       setInput('');
+      if (composerInputRef.current) composerInputRef.current.style.height = 'auto';
     } catch (error) {
       toast.error(
           `Failed to send message: ${error.message}`
@@ -898,22 +904,32 @@ const ChatPage = () => {
       return;
     }
 
-    if (!window.confirm('Delete this message?')) {
-      return;
-    }
+    setDeleteTarget(message);
+  };
 
+  const confirmDeleteMessage = () => {
+    if (!deleteTarget || !stompClient || !connected) return;
     try {
       stompClient.publish({
         destination: '/app/chat/del',
-        body: JSON.stringify({
-          messId: message.realId,
-          roomId,
-        }),
+        body: JSON.stringify({ messId: deleteTarget.realId, roomId }),
       });
+      setDeleteTarget(null);
     } catch (error) {
-      toast.error(
-          `Failed to delete message: ${error.message}`
-      );
+      toast.error(`Failed to delete message: ${error.message}`);
+    }
+  };
+
+  const handleComposerChange = (event) => {
+    setInput(event.target.value);
+    event.target.style.height = 'auto';
+    event.target.style.height = `${Math.min(event.target.scrollHeight, 160)}px`;
+  };
+
+  const handleComposerKeyDown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) {
+      event.preventDefault();
+      sendMessage();
     }
   };
 
@@ -1139,6 +1155,13 @@ const ChatPage = () => {
       const readerIds = Array.isArray(response?.readerIds) ? response.readerIds : [];
       const namesById = await resolveUsernames(readerIds);
       if (requestNumber !== receiptRequestRef.current) return;
+      setReceiptSummaryById((previous) => ({
+        ...previous,
+        [message.realId]: {
+          readCount: Number(response?.readCount ?? readerIds.length),
+          totalRecipients: Number(response?.totalRecipients ?? 0),
+        },
+      }));
 
       setReadReceipt({
         ...response,
@@ -1210,34 +1233,43 @@ const ChatPage = () => {
    * used for edit / delete.
    */
   const groupedMessages = useMemo(() => {
-    return messages.map(
-        (message, index) => ({
-          ...message,
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
 
-          realId: message.id,
+    const normalized = messages.map((message, index) => {
+      const epoch = toEpoch(message.timeStamp);
+      const date = epoch ? new Date(epoch) : null;
+      const dateKey = date ? `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}` : '';
+      const dateLabel = !date ? '' : dateKey === todayKey ? 'Today' : dateKey === yesterdayKey ? 'Yesterday' : date.toLocaleDateString([], { month: 'short', day: 'numeric', year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+      return {
+        ...message,
+        epoch,
+        dateKey,
+        dateLabel,
+        realId: message.id,
+        id: message.id || `${message.sender}-${message.content}-${index}`,
+        displaySender: usernamesById[message.sender] || (message.sender === currentUserId ? currentUsername : 'Unknown user'),
+      };
+    });
 
-          id:
-              message.id ||
-              `${message.sender}-${message.content}-${index}`,
-
-          displaySender:
-              usernamesById[
-                  message.sender
-                  ] ||
-              (
-                  message.sender ===
-                  currentUserId
-                      ? currentUsername
-                      : 'Unknown user'
-              ),
-        })
-    );
-  }, [
-    messages,
-    usernamesById,
-    currentUserId,
-    currentUsername,
-  ]);
+    return normalized.map((message, index) => {
+      const previous = normalized[index - 1];
+      const sameDate = Boolean(message.dateKey && previous?.dateKey === message.dateKey);
+      const groupedWithPrevious = Boolean(
+          previous && sameDate && previous.sender === message.sender &&
+          message.epoch && previous.epoch && message.epoch >= previous.epoch &&
+          message.epoch - previous.epoch <= 5 * 60 * 1000
+      );
+      return {
+        ...message,
+        showDateDivider: Boolean(message.dateKey && (!previous || previous.dateKey !== message.dateKey)),
+        groupedWithPrevious,
+      };
+    });
+  }, [messages, usernamesById, currentUserId, currentUsername]);
 
   return (
       <div className="chat-page page-enter" onTouchStart={handleChatTouchStart} onTouchEnd={handleChatTouchEnd}>
@@ -1320,6 +1352,17 @@ const ChatPage = () => {
             </div>
         )}
 
+        <ActionDialog
+            open={Boolean(deleteTarget)}
+            eyebrow="message moderation"
+            title="Delete this message?"
+            description="This message will be removed from the conversation for everyone. This action cannot be undone."
+            confirmLabel="Delete message"
+            destructive
+            onConfirm={confirmDeleteMessage}
+            onCancel={() => setDeleteTarget(null)}
+        />
+
         <section className="chat-workspace">
           <header className="chat-header">
             <div className="chat-header-main">
@@ -1351,35 +1394,43 @@ const ChatPage = () => {
                     const canModify = isOwn && Boolean(message.realId) && !isEditing;
                     return (
                         <Fragment key={message.id}>
+                          {message.showDateDivider && (
+                              <div className="message-date-separator" role="separator" aria-label={message.dateLabel}>
+                                <span>{message.dateLabel}</span>
+                              </div>
+                          )}
                           {message.realId && unreadMarker?.id === message.realId && (
                               <div className="unread-divider" role="separator">
                                 <span>{unreadMarker.count} new message{unreadMarker.count === 1 ? '' : 's'}</span>
                               </div>
                           )}
                           <article
-                              className="message-row"
+                              className={`message-row${message.groupedWithPrevious ? ' is-grouped' : ''}`}
                               data-mid={message.realId || undefined}
                               data-ts={message.realId ? toEpoch(message.timeStamp) : undefined}
                           >
-                            <div className="message-avatar"><Avatar src={avatarOf(message.sender)} name={message.displaySender} size={36} /></div>
+                            <div className={`message-avatar${message.groupedWithPrevious ? ' is-hidden' : ''}`} aria-hidden={message.groupedWithPrevious ? 'true' : undefined}>{!message.groupedWithPrevious && <Avatar src={avatarOf(message.sender)} name={message.displaySender} size={36} />}</div>
                             <div className="message-content">
                               <div className="message-meta">
                                 <span className={`message-author ${isOwn ? 'is-self' : ''}`}>{message.displaySender}</span>
                                 <span className="message-time">{formatTime(message.timeStamp)}</span>
                                 {message.edited && <span className="message-edited">edited</span>}
-                                {isOwn && message.realId && (
-                                    <button
-                                        type="button"
-                                        className="message-read-receipts-button"
-                                        onClick={() => openReadReceipts(message)}
-                                        disabled={receiptLoadingFor === message.realId}
-                                        title="See who read this message"
-                                        aria-label="See who read this message"
-                                    >
-                                      <MdVisibility size={13} />
-                                      {receiptLoadingFor === message.realId ? 'Loading…' : 'Read receipts'}
-                                    </button>
-                                )}
+                                {isOwn && message.realId && (() => {
+                                  const summary = receiptSummaryById[message.realId];
+                                  const wasRead = Number(summary?.readCount || 0) > 0;
+                                  return (
+                                      <button
+                                          type="button"
+                                          className={`message-delivery-status${wasRead ? ' is-read' : ''}`}
+                                          onClick={() => openReadReceipts(message)}
+                                          disabled={receiptLoadingFor === message.realId}
+                                          title={summary ? `Read by ${summary.readCount} of ${summary.totalRecipients} recipients · View details` : 'View read details'}
+                                          aria-label={summary ? `Read by ${summary.readCount} of ${summary.totalRecipients} recipients. View details` : 'View read details'}
+                                      >
+                                        {receiptLoadingFor === message.realId ? <span className="delivery-loading">…</span> : <span aria-hidden="true">{wasRead ? '✓✓' : '✓'}</span>}
+                                      </button>
+                                  );
+                                })()}
                               </div>
                               {isEditing ? (
                                   <div>
@@ -1429,10 +1480,19 @@ const ChatPage = () => {
             <div className="composer">
               <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,audio/*" multiple />
               <button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} title="Attach media" aria-label="Attach media"><MdAttachFile size={18} /></button>
-              <input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') sendMessage(); }} placeholder={isDm ? `Message @${dmTargetUsername}` : `Message #${roomId}`} aria-label="Message" />
+              <textarea
+                  ref={composerInputRef}
+                  value={input}
+                  onChange={handleComposerChange}
+                  onKeyDown={handleComposerKeyDown}
+                  rows={1}
+                  placeholder={isDm ? `Message @${dmTargetUsername}` : `Message #${roomId}`}
+                  aria-label="Message"
+                  aria-describedby="composer-help"
+              />
               <button type="button" className="btn btn-primary" onClick={sendMessage} disabled={!input.trim()} title="Send message"><MdSend size={18} /><span className="hidden sm:inline">Send</span></button>
             </div>
-            <div className="composer-note"><span>media supported · image / video / audio</span><span>enter to send</span></div>
+            <div className="composer-note" id="composer-help"><span>media supported · image / video / audio</span><span>Enter to send · Shift + Enter for a new line</span></div>
           </footer>
         </section>
 
