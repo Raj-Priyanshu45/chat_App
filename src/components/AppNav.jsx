@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { MdExplore, MdHome, MdPerson } from 'react-icons/md';
+import { motion } from 'motion/react';
 import useAuth from '../context/AuthContext';
 
 const AppNav = ({ active = 'home' }) => {
@@ -22,16 +23,25 @@ const AppNav = ({ active = 'home' }) => {
 
         <nav className="app-nav-links" aria-label="Primary navigation">
           <NavLink to="/" end className={linkClass}>
-            <MdHome size={16} />
-            Home
+            {({ isActive }) => <>
+              {isActive && <motion.span className="app-nav-active-pill" layoutId="app-nav-active-pill" aria-hidden="true" transition={{ type: 'spring', stiffness: 460, damping: 36 }} />}
+              <MdHome size={16} />
+              Home
+            </>}
           </NavLink>
-          <NavLink to="/discover" className={({ isActive }) => `app-nav-link ${isActive || active === 'discover' ? 'is-active' : ''}`}>
-            <MdExplore size={16} />
-            Discover
+          <NavLink to="/discover" className={({ isActive }) => `app-nav-link ${isActive ? 'is-active' : ''}`}>
+            {({ isActive }) => <>
+              {isActive && <motion.span className="app-nav-active-pill" layoutId="app-nav-active-pill" aria-hidden="true" transition={{ type: 'spring', stiffness: 460, damping: 36 }} />}
+              <MdExplore size={16} />
+              Discover
+            </>}
           </NavLink>
-          <NavLink to="/profile" className={({ isActive }) => `app-nav-link ${isActive || active === 'profile' ? 'is-active' : ''}`}>
-            <MdPerson size={16} />
-            Profile
+          <NavLink to="/profile" className={({ isActive }) => `app-nav-link ${isActive ? 'is-active' : ''}`}>
+            {({ isActive }) => <>
+              {isActive && <motion.span className="app-nav-active-pill" layoutId="app-nav-active-pill" aria-hidden="true" transition={{ type: 'spring', stiffness: 460, damping: 36 }} />}
+              <MdPerson size={16} />
+              Profile
+            </>}
           </NavLink>
         </nav>
 

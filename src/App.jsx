@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { MotionConfig } from 'motion/react';
 import JoinCreateChat from './components/JoinCreateChat';
 import ChatPage from './components/ChatPage';
 import DiscoverRooms from './components/DiscoverRooms';
@@ -17,44 +18,46 @@ import './App.css';
 
 function App() {
   return (
-      <ChatProvider>
-        <BrowserRouter>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 3200,
-              style: {
-                background: '#171a18',
-                color: '#f4f1e9',
-                border: '1px solid rgba(255,255,255,.09)',
-                borderRadius: '14px',
-                fontSize: '12px',
-                boxShadow: '0 18px 55px rgba(0,0,0,.32)',
-              },
-            }}
-          />
-          <Routes>
-            {/* public */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/complete-profile" element={<CompleteProfilePage />} />
+      <MotionConfig reducedMotion="user" transition={{ duration: 0.18, ease: 'easeOut' }}>
+        <ChatProvider>
+          <BrowserRouter>
+            <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 3200,
+                  style: {
+                    background: '#171a18',
+                    color: '#f4f1e9',
+                    border: '1px solid rgba(255,255,255,.09)',
+                    borderRadius: '14px',
+                    fontSize: '12px',
+                    boxShadow: '0 18px 55px rgba(0,0,0,.32)',
+                  },
+                }}
+            />
+            <Routes>
+              {/* public */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/complete-profile" element={<CompleteProfilePage />} />
 
-            {/* the backend redirects here after OAuth login */}
-            <Route path="/home" element={<Navigate to="/" replace />} />
+              {/* the backend redirects here after OAuth login */}
+              <Route path="/home" element={<Navigate to="/" replace />} />
 
-            {/* protected */}
-            <Route path="/" element={<ProtectedRoute><JoinCreateChat /></ProtectedRoute>} />
-            <Route path="/discover" element={<ProtectedRoute><DiscoverRooms /></ProtectedRoute>} />
-            <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              {/* protected */}
+              <Route path="/" element={<ProtectedRoute><JoinCreateChat /></ProtectedRoute>} />
+              <Route path="/discover" element={<ProtectedRoute><DiscoverRooms /></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-          </Routes>
-        </BrowserRouter>
-      </ChatProvider>
+              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+            </Routes>
+          </BrowserRouter>
+        </ChatProvider>
+      </MotionConfig>
   );
 }
 

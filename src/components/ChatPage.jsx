@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -7,6 +6,7 @@ import {
   useState,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { fetchWsTicketApi } from '../services/ProfileService';
 import Avatar from './Avatar';
 import ChatSidebar from './ChatSidebar';
@@ -1294,63 +1294,72 @@ const ChatPage = () => {
             onOpenDm={openDmFromSidebar}
         />
 
-        {showMembers && <MembersModal members={memberViewModels} onMessagePrivately={handleStartDm} onViewProfile={setProfileUserId} onClose={() => setShowMembers(false)} />}
-        {profileUserId && (
-            <UserProfileModal
-                userId={profileUserId}
-                onMessage={(id) => { setProfileUserId(null); setShowMembers(false); handleStartDm(id); }}
-                onClose={() => setProfileUserId(null)}
-            />
-        )}
+        <AnimatePresence initial={false}>
+          {showMembers && <MembersModal key="members-modal" members={memberViewModels} onMessagePrivately={handleStartDm} onViewProfile={setProfileUserId} onClose={() => setShowMembers(false)} />}
+          {profileUserId && (
+              <UserProfileModal
+                  key={`profile-${profileUserId}`}
+                  userId={profileUserId}
+                  onMessage={(id) => { setProfileUserId(null); setShowMembers(false); handleStartDm(id); }}
+                  onClose={() => setProfileUserId(null)}
+              />
+          )}
+        </AnimatePresence>
 
-        {readReceipt && (
-            <div className="read-receipt-overlay" role="presentation" onClick={closeReadReceipts}>
-              <section
-                  className="read-receipt-dialog"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="read-receipt-title"
-                  onClick={(event) => event.stopPropagation()}
-              >
-                <div className="read-receipt-header">
-                  <div>
-                    <div className="page-kicker">message details</div>
-                    <h2 id="read-receipt-title" className="read-receipt-title">Read receipts</h2>
-                    <p className="read-receipt-summary">
-                      {readReceipt.loading
-                          ? 'Loading readers…'
-                          : `Read by ${readReceipt.readCount ?? readReceipt.readers?.length ?? 0} of ${readReceipt.totalRecipients ?? 0} active recipients`}
-                    </p>
+        <AnimatePresence initial={false}>
+          {readReceipt && (
+              <motion.div key="read-receipt-overlay" className="read-receipt-overlay" role="presentation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} onClick={closeReadReceipts}>
+                <motion.section
+                    className="read-receipt-dialog"
+                    initial={{ opacity: 0, scale: 0.96, y: 7 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.98, y: 4 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="read-receipt-title"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="read-receipt-header">
+                    <div>
+                      <div className="page-kicker">message details</div>
+                      <h2 id="read-receipt-title" className="read-receipt-title">Read receipts</h2>
+                      <p className="read-receipt-summary">
+                        {readReceipt.loading
+                            ? 'Loading readers…'
+                            : `Read by ${readReceipt.readCount ?? readReceipt.readers?.length ?? 0} of ${readReceipt.totalRecipients ?? 0} active recipients`}
+                      </p>
+                    </div>
+                    <button type="button" className="icon-button" onClick={closeReadReceipts} aria-label="Close read receipts" title="Close">
+                      <MdClose size={18} />
+                    </button>
                   </div>
-                  <button type="button" className="icon-button" onClick={closeReadReceipts} aria-label="Close read receipts" title="Close">
-                    <MdClose size={18} />
-                  </button>
-                </div>
 
-                {readReceipt.loading ? (
-                    <div className="read-receipt-empty">Loading reader list…</div>
-                ) : readReceipt.readers?.length ? (
-                    <ul className="read-receipt-list">
-                      {readReceipt.readers.map((reader) => (
-                          <li key={reader.id} className="read-receipt-reader">
+                  {readReceipt.loading ? (
+                      <div className="read-receipt-empty">Loading reader list…</div>
+                  ) : readReceipt.readers?.length ? (
+                      <ul className="read-receipt-list">
+                        {readReceipt.readers.map((reader) => (
+                            <li key={reader.id} className="read-receipt-reader">
                     <span className="read-receipt-avatar" aria-hidden="true">
                       {(reader.username?.[0] || '?').toUpperCase()}
                     </span>
-                            <span className="read-receipt-username">@{reader.username}</span>
-                            <span className="read-receipt-status">Read</span>
-                          </li>
-                      ))}
-                    </ul>
-                ) : (
-                    <div className="read-receipt-empty">
-                      {(readReceipt.totalRecipients ?? 0) === 0
-                          ? 'There are no other active recipients in this room.'
-                          : 'Nobody has read this message yet.'}
-                    </div>
-                )}
-              </section>
-            </div>
-        )}
+                              <span className="read-receipt-username">@{reader.username}</span>
+                              <span className="read-receipt-status">Read</span>
+                            </li>
+                        ))}
+                      </ul>
+                  ) : (
+                      <div className="read-receipt-empty">
+                        {(readReceipt.totalRecipients ?? 0) === 0
+                            ? 'There are no other active recipients in this room.'
+                            : 'Nobody has read this message yet.'}
+                      </div>
+                  )}
+                </motion.section>
+              </motion.div>
+          )}
+        </AnimatePresence>
 
         <ActionDialog
             open={Boolean(deleteTarget)}
@@ -1387,29 +1396,62 @@ const ChatPage = () => {
                     </div>
                   </div>
               ) : (
-                  groupedMessages.map((message) => {
-                    const isOwn = message.sender === currentUserId;
-                    const isTextMessage = !message.type || message.type === 'TEXT';
-                    const isEditing = editingId !== null && editingId === message.realId;
-                    const canModify = isOwn && Boolean(message.realId) && !isEditing;
-                    return (
-                        <Fragment key={message.id}>
-                          {message.showDateDivider && (
-                              <div className="message-date-separator" role="separator" aria-label={message.dateLabel}>
-                                <span>{message.dateLabel}</span>
-                              </div>
-                          )}
-                          {message.realId && unreadMarker?.id === message.realId && (
-                              <div className="unread-divider" role="separator">
-                                <span>{unreadMarker.count} new message{unreadMarker.count === 1 ? '' : 's'}</span>
-                              </div>
-                          )}
-                          <article
+                  <AnimatePresence initial={false}>
+                    {groupedMessages.flatMap((message) => {
+                      const isOwn = message.sender === currentUserId;
+                      const isTextMessage = !message.type || message.type === 'TEXT';
+                      const isEditing = editingId !== null && editingId === message.realId;
+                      const canModify = isOwn && Boolean(message.realId) && !isEditing;
+                      const items = [];
+
+                      if (message.showDateDivider) {
+                        items.push(
+                            <motion.div
+                                key={`date-${message.dateKey}`}
+                                className="message-date-separator"
+                                role="separator"
+                                aria-label={message.dateLabel}
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -3 }}
+                                transition={{ duration: 0.18 }}
+                            >
+                              <span>{message.dateLabel}</span>
+                            </motion.div>
+                        );
+                      }
+
+                      if (message.realId && unreadMarker?.id === message.realId) {
+                        items.push(
+                            <motion.div
+                                key={`unread-${message.realId}`}
+                                className="unread-divider"
+                                role="separator"
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -3 }}
+                                transition={{ duration: 0.18 }}
+                            >
+                              <span>{unreadMarker.count} new message{unreadMarker.count === 1 ? '' : 's'}</span>
+                            </motion.div>
+                        );
+                      }
+
+                      items.push(
+                          <motion.article
+                              key={message.id}
+                              layout
+                              initial={{ opacity: 0, x: isOwn ? 12 : -12, y: 4 }}
+                              animate={{ opacity: 1, x: 0, y: 0 }}
+                              exit={{ opacity: 0, x: isOwn ? 8 : -8 }}
+                              transition={{ type: 'spring', stiffness: 430, damping: 38, mass: 0.7 }}
                               className={`message-row${message.groupedWithPrevious ? ' is-grouped' : ''}`}
                               data-mid={message.realId || undefined}
                               data-ts={message.realId ? toEpoch(message.timeStamp) : undefined}
                           >
-                            <div className={`message-avatar${message.groupedWithPrevious ? ' is-hidden' : ''}`} aria-hidden={message.groupedWithPrevious ? 'true' : undefined}>{!message.groupedWithPrevious && <Avatar src={avatarOf(message.sender)} name={message.displaySender} size={36} />}</div>
+                            <div className={`message-avatar${message.groupedWithPrevious ? ' is-hidden' : ''}`} aria-hidden={message.groupedWithPrevious ? 'true' : undefined}>
+                              {!message.groupedWithPrevious && <Avatar src={avatarOf(message.sender)} name={message.displaySender} size={36} />}
+                            </div>
                             <div className="message-content">
                               <div className="message-meta">
                                 <span className={`message-author ${isOwn ? 'is-self' : ''}`}>{message.displaySender}</span>
@@ -1453,10 +1495,11 @@ const ChatPage = () => {
                                   <button type="button" className="message-action is-danger" onClick={() => deleteMessage(message)} title="Delete message" aria-label="Delete message"><MdDelete size={15} /></button>
                                 </div>
                             )}
-                          </article>
-                        </Fragment>
-                    );
-                  })
+                          </motion.article>
+                      );
+                      return items;
+                    })}
+                  </AnimatePresence>
               )}
             </div>
           </main>

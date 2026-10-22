@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { MdAdd, MdClose, MdMeetingRoom, MdSearch, MdLogout } from 'react-icons/md';
 import Avatar from './Avatar';
 import useAuth from '../context/AuthContext';
@@ -145,10 +146,15 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
         onCloseMobile?.();
     };
 
-    const roomButton = (id, active = false) => (
-        <button
+    const roomButton = (id, active = false, index = 0) => (
+        <motion.button
             type="button"
             key={id}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ x: 2 }}
+            whileTap={{ scale: 0.99 }}
+            transition={{ duration: 0.17, delay: Math.min(index * 0.025, 0.15) }}
             className={`chat-sidebar-item ${active ? 'is-active' : ''}`}
             onClick={() => openRoom(id)}
             aria-current={active ? 'page' : undefined}
@@ -159,7 +165,7 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
         <span className="chat-sidebar-item-subtitle">Room</span>
       </span>
             {unreadByRoom[id] > 0 && <span className="unread-badge">{unreadByRoom[id] > 99 ? '99+' : unreadByRoom[id]}</span>}
-        </button>
+        </motion.button>
     );
 
     return (
@@ -193,7 +199,7 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
                     {currentGroupRoom && !query && (
                         <section className="chat-sidebar-section">
                             <div className="chat-sidebar-section-heading">Current room</div>
-                            {roomButton(currentGroupRoom, true)}
+                            {roomButton(currentGroupRoom, true, 0)}
                         </section>
                     )}
 
@@ -204,7 +210,7 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
                         {loading ? (
                             <div className="chat-sidebar-skeletons"><span /><span /><span /></div>
                         ) : filteredRooms.filter((id) => query || id !== currentGroupRoom).length ? (
-                            filteredRooms.filter((id) => query || id !== currentGroupRoom).map((id) => roomButton(id, !isDm && id === roomId))
+                            filteredRooms.filter((id) => query || id !== currentGroupRoom).map((id, index) => roomButton(id, !isDm && id === roomId, index))
                         ) : (
                             <p className="chat-sidebar-empty">{query ? 'No matching rooms.' : 'Rooms you join will appear here.'}</p>
                         )}
@@ -221,9 +227,14 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
                             const friendRoomId = computeDmRoomId(currentUserId, friendId);
                             const active = isDm && friendId === dmTarget;
                             return (
-                                <button
+                                <motion.button
                                     type="button"
                                     key={friendId}
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    whileHover={{ x: 2 }}
+                                    whileTap={{ scale: 0.99 }}
+                                    transition={{ duration: 0.17, delay: Math.min(filteredFriends.indexOf(friendId) * 0.025, 0.15) }}
                                     className={`chat-sidebar-item chat-sidebar-dm ${active ? 'is-active' : ''}`}
                                     onClick={() => openDm(friendId)}
                                     aria-current={active ? 'page' : undefined}
@@ -236,7 +247,7 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
                     <span className="chat-sidebar-item-subtitle">Direct message</span>
                   </span>
                                     {unreadByRoom[friendRoomId] > 0 && <span className="unread-badge">{unreadByRoom[friendRoomId] > 99 ? '99+' : unreadByRoom[friendRoomId]}</span>}
-                                </button>
+                                </motion.button>
                             );
                         })}
                     </section>
