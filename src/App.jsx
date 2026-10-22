@@ -13,52 +13,57 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { ChatProvider } from './context/ChatContext';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
+import WorkspaceCommandPalette from './components/WorkspaceCommandPalette';
+import { ThemeProvider } from './context/ThemeContext';
 
 import './App.css';
 
 function App() {
-  return (
-      <MotionConfig reducedMotion="user" transition={{ duration: 0.18, ease: 'easeOut' }}>
-        <ChatProvider>
-          <BrowserRouter>
-            <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 3200,
-                  style: {
-                    background: '#171a18',
-                    color: '#f4f1e9',
-                    border: '1px solid rgba(255,255,255,.09)',
-                    borderRadius: '14px',
-                    fontSize: '12px',
-                    boxShadow: '0 18px 55px rgba(0,0,0,.32)',
-                  },
-                }}
-            />
-            <Routes>
-              {/* public */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
-              <Route path="/complete-profile" element={<CompleteProfilePage />} />
+    return (
+        <MotionConfig reducedMotion="user" transition={{ duration: 0.18, ease: 'easeOut' }}>
+            <ChatProvider>
+                <BrowserRouter>
+                    <ThemeProvider>
+                        <Toaster
+                            position="top-right"
+                            toastOptions={{
+                                duration: 3200,
+                                style: {
+                                    background: 'var(--app-surface-solid)',
+                                    color: 'var(--app-text)',
+                                    border: '1px solid var(--app-border)',
+                                    borderRadius: '14px',
+                                    fontSize: '12px',
+                                    boxShadow: 'var(--app-shadow)',
+                                },
+                            }}
+                        />
+                        <Routes>
+                            {/* public */}
+                            <Route path="/login" element={<LoginPage />} />
+                            <Route path="/register" element={<RegisterPage />} />
+                            <Route path="/verify-email" element={<VerifyEmailPage />} />
+                            <Route path="/complete-profile" element={<CompleteProfilePage />} />
 
-              {/* the backend redirects here after OAuth login */}
-              <Route path="/home" element={<Navigate to="/" replace />} />
+                            {/* the backend redirects here after OAuth login */}
+                            <Route path="/home" element={<Navigate to="/" replace />} />
 
-              {/* protected */}
-              <Route path="/" element={<ProtectedRoute><JoinCreateChat /></ProtectedRoute>} />
-              <Route path="/discover" element={<ProtectedRoute><DiscoverRooms /></ProtectedRoute>} />
-              <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                            {/* protected */}
+                            <Route path="/" element={<ProtectedRoute><JoinCreateChat /></ProtectedRoute>} />
+                            <Route path="/discover" element={<ProtectedRoute><DiscoverRooms /></ProtectedRoute>} />
+                            <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+                            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
-              <Route path="*" element={<Navigate to="/" replace />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-            </Routes>
-          </BrowserRouter>
-        </ChatProvider>
-      </MotionConfig>
-  );
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                            <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        </Routes>
+                        <WorkspaceCommandPalette />
+                    </ThemeProvider>
+                </BrowserRouter>
+            </ChatProvider>
+        </MotionConfig>
+    );
 }
 
 export default App;

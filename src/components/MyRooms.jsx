@@ -10,7 +10,7 @@ import ActionDialog from './ActionDialog';
 
 const isDmRoomId = (roomId, userId) => Boolean(userId) && roomId.length === userId.length * 2 && roomId.includes(userId);
 
-const MyRooms = () => {
+const MyRooms = ({ variant = 'list' }) => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState(null);
@@ -110,7 +110,7 @@ const MyRooms = () => {
   if (loading) {
     return (
         <>
-          <div className="room-list">
+          <div className={`room-list ${variant === 'cards' ? 'room-list-cards' : ''}`.trim()}>
             {[1, 2, 3].map((item) => <div className="skeleton" key={item} style={{ height: 48 }} />)}
           </div>
           <RoomPasswordDialog dialog={passwordDialog} busy={passwordBusy} onChange={(value) => setPasswordDialog((prev) => ({ ...prev, value }))} onConfirm={submitRoomPassword} onCancel={() => setPasswordDialog({ open: false, roomId: '', value: '' })} />
@@ -133,12 +133,12 @@ const MyRooms = () => {
 
   return (
       <>
-        <div className="room-list">
+        <div className={`room-list ${variant === 'cards' ? 'room-list-cards' : ''}`.trim()}>
           {rooms.map((roomId) => (
               <div key={roomId} className="room-row">
                 <div style={{ minWidth: 0 }}>
                   <span className="room-id">#{roomId}</span>
-                  <span className="room-meta"><span className="room-meta-dot" /> active membership</span>
+                  <span className="room-meta"><span className="room-meta-dot" /> saved room</span>
                 </div>
                 <div className="room-row-actions">
                   {unread[roomId] > 0 && (

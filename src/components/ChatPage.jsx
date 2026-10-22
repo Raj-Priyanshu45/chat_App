@@ -31,6 +31,7 @@ import {
   MdVisibility,
   MdHome,
   MdMeetingRoom,
+  MdAddReaction,
 } from 'react-icons/md';
 
 import useChatContext from '../context/ChatContext';
@@ -95,6 +96,8 @@ const applyMessageEvent = (payload, setMessages) => {
   return false;
 };
 
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '👀'];
+
 const dispatchUnreadUpdate = (detail) => {
   if (typeof window === 'undefined') return;
   window.setTimeout(() => {
@@ -137,6 +140,11 @@ const ChatPage = () => {
   const [receiptSummaryById, setReceiptSummaryById] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [receiptLoadingFor, setReceiptLoadingFor] = useState(null);
+  const [typingUserIds, setTypingUserIds] = useState([]);
+  const [onlineUserIds, setOnlineUserIds] = useState([]);
+  const [presenceByUserId, setPresenceByUserId] = useState({});
+  const [presenceReady, setPresenceReady] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState(null);
   const [mobileRoomsOpen, setMobileRoomsOpen] = useState(() =>
       !roomId && typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
   );
@@ -157,6 +165,9 @@ const ChatPage = () => {
   const receiptRequestRef = useRef(0);
   const messagesRef = useRef(messages);
   const touchStartRef = useRef(null);
+  const typingTimeoutsRef = useRef(new Map());
+  const localTypingTimerRef = useRef(null);
+  const localTypingRef = useRef(false);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -259,6 +270,97 @@ const ChatPage = () => {
         return result;
       }, {});
     }
+  }, []);
+
+  // Consume transient STOMP events before treating a payload as a message.
+  const handleRealtimeEvent = useCallback((payload) => {
+    const type = payload?.type;
+    if (!['TYPING', 'PRESENCE', 'PRESENCE_SNAPSHOT', 'MESSAGE_REACTION_UPDATED'].includes(type)) {
+      return false;
+    }
+
+    // Presence events arriving through the DM queue may refer to any of this user's DMs.
+    if (payload.roomId && payload.roomId !== roomId && type !== 'PRESENCE') return true;
+
+    if (type === 'TYPING') {
+      const userId = payload.userId;
+      if (!userId || userId === currentUserId) return true;
+      const existingTimer = typingTimeoutsRef.current.get(userId);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      if (payload.typing) {
+        setTypingUserIds((previous) => previous.includes(userId) ? previous : [...previous, userId]);
+        void resolveUsernames([userId]);
+        const timeout = setTimeout(() => {
+          setTypingUserIds((previous) => previous.filter((id) => id !== userId));
+          typingTimeoutsRef.current.delete(userId);
+        }, 2600);
+        typingTimeoutsRef.current.set(userId, timeout);
+      } else {
+        setTypingUserIds((previous) => previous.filter((id) => id !== userId));
+        typingTimeoutsRef.current.delete(userId);
+      }
+      return true;
+    }
+
+    if (type === 'PRESENCE') {
+      if (!payload.userId || payload.userId === currentUserId) return true;
+      setPresenceByUserId((previous) => ({ ...previous, [payload.userId]: Boolean(payload.online) }));
+      if (payload.roomId === roomId) {
+        setPresenceReady(true);
+        setOnlineUserIds((previous) => {
+          const next = new Set(previous);
+          if (payload.online) next.add(payload.userId);
+          else next.delete(payload.userId);
+          return [...next];
+        });
+      }
+      return true;
+    }
+
+    if (type === 'PRESENCE_SNAPSHOT') {
+      const onlineIds = (payload.onlineUserIds || []).filter(Boolean);
+      setPresenceReady(true);
+      setOnlineUserIds(onlineIds);
+      setPresenceByUserId((previous) => {
+        const next = { ...previous };
+        onlineIds.forEach((id) => { next[id] = true; });
+        // A snapshot is authoritative for the currently open DM target.
+        if (isDmRef.current && dmTargetRef.current) {
+          next[dmTargetRef.current] = onlineIds.includes(dmTargetRef.current);
+        }
+        return next;
+      });
+      return true;
+    }
+
+    if (type === 'MESSAGE_REACTION_UPDATED') {
+      setMessages((previous) => previous.map((message) =>
+          (message.id || message.realId) === payload.messageId
+              ? { ...message, reactions: payload.reactions || {} }
+              : message
+      ));
+      return true;
+    }
+
+    return true;
+  }, [roomId, currentUserId, resolveUsernames]);
+
+  useEffect(() => {
+    setTypingUserIds([]);
+    setOnlineUserIds([]);
+    setPresenceReady(false);
+    setReactionPickerFor(null);
+    localTypingRef.current = false;
+    if (localTypingTimerRef.current) clearTimeout(localTypingTimerRef.current);
+    typingTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
+    typingTimeoutsRef.current.clear();
+  }, [roomId]);
+
+  useEffect(() => () => {
+    if (localTypingTimerRef.current) clearTimeout(localTypingTimerRef.current);
+    typingTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
+    typingTimeoutsRef.current.clear();
   }, []);
 
   /*
@@ -455,10 +557,6 @@ const ChatPage = () => {
       onConnect: () => {
         setStompClient(client);
 
-        toast.success(
-            'Connected to chat'
-        );
-
         /*
          * GROUP ROOM
          */
@@ -474,6 +572,7 @@ const ChatPage = () => {
                   if (applyMessageEvent(payload, setMessages)) {
                     return;
                   }
+                  if (handleRealtimeEvent(payload)) return;
 
                   if (payload.sender) {
                     await resolveUsernames([
@@ -507,6 +606,8 @@ const ChatPage = () => {
               try {
                 const payload =
                     JSON.parse(message.body);
+
+                if (handleRealtimeEvent(payload)) return;
 
                 // edit / delete events
                 if (payload?.type === 'MESSAGE_DELETED' || payload?.type === 'MESSAGE_EDITED') {
@@ -656,6 +757,20 @@ const ChatPage = () => {
             }
         );
 
+        // Presence snapshots are private to the authenticated WebSocket user.
+        client.subscribe('/user/queue/presence', (message) => {
+          try {
+            handleRealtimeEvent(JSON.parse(message.body));
+          } catch {
+            // Ignore malformed presence data.
+          }
+        });
+
+        client.publish({
+          destination: `/app/chat/presence/${roomId}`,
+          body: '{}',
+        });
+
         /*
          * Reconnection sync.
          */
@@ -733,9 +848,14 @@ const ChatPage = () => {
       },
 
       onWebSocketError: () => {
+        setStompClient(null);
         toast.error(
             'Unable to connect to chat server.'
         );
+      },
+
+      onWebSocketClose: () => {
+        setStompClient(null);
       },
 
       onDisconnect: () => {
@@ -766,6 +886,7 @@ const ChatPage = () => {
     isDm,
     currentUserId,
     resolveUsernames,
+    handleRealtimeEvent,
     setConnected,
     setDmTarget,
     setIsDm,
@@ -805,6 +926,39 @@ const ChatPage = () => {
     if (nearBottom) setNewBelow(0);
   };
 
+  const publishTypingState = useCallback((typing) => {
+    if (!stompClient || !connected || !roomId) return;
+    if (!stompClient.connected) {
+      // If a connection drops mid-composition, let the remote timeout clear state
+      // and reset locally so a reconnect can publish a fresh typing=true event.
+      if (!typing) localTypingRef.current = false;
+      return;
+    }
+    if (localTypingRef.current === typing) return;
+    try {
+      stompClient.publish({
+        destination: `/app/chat/typing/${roomId}`,
+        body: JSON.stringify({ typing }),
+      });
+      localTypingRef.current = typing;
+    } catch {
+      // Typing is best-effort; message delivery is independent.
+    }
+  }, [stompClient, connected, roomId]);
+
+  const toggleReaction = (messageId, emoji) => {
+    if (!stompClient || !connected || !messageId || !roomId) return;
+    try {
+      stompClient.publish({
+        destination: `/app/chat/reaction/${roomId}`,
+        body: JSON.stringify({ messageId, emoji }),
+      });
+      setReactionPickerFor(null);
+    } catch {
+      toast.error('Could not send reaction. Please try again.');
+    }
+  };
+
   /*
    * Send message.
    *
@@ -834,6 +988,8 @@ const ChatPage = () => {
         body: JSON.stringify(payload),
       });
 
+      if (localTypingTimerRef.current) clearTimeout(localTypingTimerRef.current);
+      publishTypingState(false);
       setInput('');
       if (composerInputRef.current) composerInputRef.current.style.height = 'auto';
     } catch (error) {
@@ -921,9 +1077,18 @@ const ChatPage = () => {
   };
 
   const handleComposerChange = (event) => {
-    setInput(event.target.value);
+    const nextValue = event.target.value;
+    setInput(nextValue);
     event.target.style.height = 'auto';
     event.target.style.height = `${Math.min(event.target.scrollHeight, 160)}px`;
+
+    if (localTypingTimerRef.current) clearTimeout(localTypingTimerRef.current);
+    if (nextValue.trim()) {
+      publishTypingState(true);
+      localTypingTimerRef.current = setTimeout(() => publishTypingState(false), 1500);
+    } else {
+      publishTypingState(false);
+    }
   };
 
   const handleComposerKeyDown = (event) => {
@@ -1226,6 +1391,14 @@ const ChatPage = () => {
   const dmTargetUsername =
       usernamesById[dmTarget] ||
       'Unknown user';
+  const typingLabel = useMemo(() => {
+    const names = typingUserIds.map((id) => usernamesById[id] || 'Someone');
+    if (!names.length) return '';
+    if (names.length === 1) return `${names[0]} is typing`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing`;
+    return `${names.length} people are typing`;
+  }, [typingUserIds, usernamesById]);
+  const dmTargetOnline = onlineUserIds.includes(dmTarget);
 
   /*
    * Visible message data.
@@ -1288,6 +1461,7 @@ const ChatPage = () => {
 
         <ChatSidebar
             mobileOpen={mobileRoomsOpen}
+            presenceByUserId={presenceByUserId}
             onLogout={handleLogout}
             onCloseMobile={() => setMobileRoomsOpen(false)}
             onOpenRoom={openRoomFromSidebar}
@@ -1377,9 +1551,15 @@ const ChatPage = () => {
             <div className="chat-header-main">
               <div className="chat-header-kicker">{isDm ? 'direct conversation' : 'live room'}</div>
               <div className="chat-header-title">{isDm ? <><span>@</span>{dmTargetUsername}</> : <><span>#</span>{roomId}</>}</div>
+              {presenceReady && (isDm || onlineUserIds.length > 0) && (
+                  <div className="chat-presence-summary">
+                    <span className={`presence-dot${(isDm ? dmTargetOnline : onlineUserIds.length > 0) ? ' is-online' : ''}`} />
+                    {isDm ? (dmTargetOnline ? 'Online' : 'Offline') : `${onlineUserIds.length} online`}
+                  </div>
+              )}
             </div>
             <div className="chat-header-actions">
-              {connected && <div className="connection-pill"><span className="live-dot" /> Connected</div>}
+              <div className={`connection-pill${stompClient?.connected ? '' : ' is-reconnecting'}`} aria-live="polite"><span className="live-dot" /> {stompClient?.connected ? 'Connected' : 'Reconnecting…'}</div>
               {!isDm && <button type="button" className="btn btn-secondary" onClick={openMembers}><MdGroup size={16} /> Members</button>}
               <button type="button" className="icon-button" onClick={handleLeaveRoom} title={isDm ? 'Close conversation' : 'Leave room'} aria-label={isDm ? 'Close conversation' : 'Leave room'}><MdClose size={18} /></button>
             </div>
@@ -1488,11 +1668,28 @@ const ChatPage = () => {
                               ) : (
                                   <p className="message-body">{message.content}</p>
                               )}
+                              {Object.entries(message.reactions || {}).some(([, users]) => Array.isArray(users) && users.length > 0) && (
+                                  <div className="message-reactions" aria-label="Message reactions">
+                                    {Object.entries(message.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length > 0).map(([emoji, users]) => (
+                                        <button key={emoji} type="button" className={`reaction-chip${users.includes(currentUserId) ? ' is-selected' : ''}`} onClick={() => toggleReaction(message.realId, emoji)} aria-label={`${emoji}, ${users.length} reactions`}>
+                                          <span>{emoji}</span><span>{users.length}</span>
+                                        </button>
+                                    ))}
+                                  </div>
+                              )}
+                              {reactionPickerFor === message.realId && (
+                                  <div className="reaction-picker" role="group" aria-label="Choose a reaction">
+                                    {REACTION_EMOJIS.map((emoji) => (
+                                        <button key={emoji} type="button" onClick={() => toggleReaction(message.realId, emoji)} aria-label={`React with ${emoji}`}>{emoji}</button>
+                                    ))}
+                                  </div>
+                              )}
                             </div>
-                            {canModify && (
+                            {message.realId && (
                                 <div className="message-actions">
-                                  {isTextMessage && <button type="button" className="message-action" onClick={() => startEdit(message)} title="Edit message" aria-label="Edit message"><MdEdit size={15} /></button>}
-                                  <button type="button" className="message-action is-danger" onClick={() => deleteMessage(message)} title="Delete message" aria-label="Delete message"><MdDelete size={15} /></button>
+                                  <button type="button" className="message-action" onClick={() => setReactionPickerFor((id) => id === message.realId ? null : message.realId)} title="Add reaction" aria-label="Add reaction"><MdAddReaction size={16} /></button>
+                                  {canModify && isTextMessage && <button type="button" className="message-action" onClick={() => startEdit(message)} title="Edit message" aria-label="Edit message"><MdEdit size={15} /></button>}
+                                  {canModify && <button type="button" className="message-action is-danger" onClick={() => deleteMessage(message)} title="Delete message" aria-label="Delete message"><MdDelete size={15} /></button>}
                                 </div>
                             )}
                           </motion.article>
@@ -1519,6 +1716,15 @@ const ChatPage = () => {
               </button>
           )}
 
+          <AnimatePresence initial={false}>
+            {typingLabel && (
+                <motion.div className="typing-indicator" role="status" aria-live="polite" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -3 }} transition={{ duration: 0.18 }}>
+                  <span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>
+                  <span>{typingLabel}</span>
+                </motion.div>
+            )}
+          </AnimatePresence>
+
           <footer className="composer-wrap">
             <div className="composer">
               <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,audio/*" multiple />
@@ -1528,6 +1734,10 @@ const ChatPage = () => {
                   value={input}
                   onChange={handleComposerChange}
                   onKeyDown={handleComposerKeyDown}
+                  onBlur={() => {
+                    if (localTypingTimerRef.current) clearTimeout(localTypingTimerRef.current);
+                    publishTypingState(false);
+                  }}
                   rows={1}
                   placeholder={isDm ? `Message @${dmTargetUsername}` : `Message #${roomId}`}
                   aria-label="Message"

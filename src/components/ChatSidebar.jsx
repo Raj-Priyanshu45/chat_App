@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { MdAdd, MdClose, MdMeetingRoom, MdSearch, MdLogout } from 'react-icons/md';
 import Avatar from './Avatar';
+import ThemeToggle from './ThemeToggle';
+import { requestPaletteOpen } from './WorkspaceCommandPalette';
 import useAuth from '../context/AuthContext';
 import useChatContext from '../context/ChatContext';
 import { getMyProfile } from '../services/ProfileService';
@@ -14,7 +16,7 @@ import { useAvatars } from '../hooks/useAvatars';
 const isLikelyDmRoomId = (roomId, userId) =>
     Boolean(userId) && roomId.length === userId.length * 2 && roomId.includes(userId);
 
-const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, onLogout }) => {
+const ChatSidebar = ({ mobileOpen = false, presenceByUserId = {}, onCloseMobile, onOpenRoom, onOpenDm, onLogout }) => {
     const auth = useAuth();
     const navigate = useNavigate();
     const { roomId, isDm, dmTarget } = useChatContext();
@@ -178,6 +180,8 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
                         <span><strong>ChatCom</strong><small>your workspace</small></span>
                     </div>
                     <div className="chat-sidebar-header-actions">
+                        <button type="button" className="chat-sidebar-icon-button" onClick={requestPaletteOpen} title="Search pages and rooms (⌘K)" aria-label="Open command palette"><MdSearch size={17} /></button>
+                        <ThemeToggle compact className="chat-sidebar-icon-button theme-toggle-sidebar" />
                         <button type="button" className="chat-sidebar-icon-button" onClick={() => navigate('/')} title="Join or create a room" aria-label="Join or create a room"><MdAdd size={19} /></button>
                         <button type="button" className="chat-sidebar-icon-button chat-sidebar-mobile-close" onClick={onCloseMobile} title="Close room list" aria-label="Close room list"><MdClose size={19} /></button>
                     </div>
@@ -241,10 +245,13 @@ const ChatSidebar = ({ mobileOpen = false, onCloseMobile, onOpenRoom, onOpenDm, 
                                 >
                   <span className="chat-sidebar-avatar-wrap">
                     <Avatar src={avatarOf(friendId)} name={name} size={34} />
+                      {typeof presenceByUserId[friendId] === 'boolean' && (
+                          <span className={`chat-sidebar-presence-dot${presenceByUserId[friendId] ? ' is-online' : ''}`} title={presenceByUserId[friendId] ? 'Online' : 'Offline'} aria-label={presenceByUserId[friendId] ? 'Online' : 'Offline'} />
+                      )}
                   </span>
                                     <span className="chat-sidebar-item-copy">
                     <span className="chat-sidebar-item-title">@{name}</span>
-                    <span className="chat-sidebar-item-subtitle">Direct message</span>
+                    <span className="chat-sidebar-item-subtitle">{presenceByUserId[friendId] === true ? 'Online now' : presenceByUserId[friendId] === false ? 'Offline' : 'Direct message'}</span>
                   </span>
                                     {unreadByRoom[friendRoomId] > 0 && <span className="unread-badge">{unreadByRoom[friendRoomId] > 99 ? '99+' : unreadByRoom[friendRoomId]}</span>}
                                 </motion.button>
